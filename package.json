@@ -9,7 +9,7 @@
   "name": "armada-vscode",
   "displayName": "Armada",
   "description": "VSCode extension for Armada - Kubernetes batch job scheduler",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "thefunktion",
   "engines": {
     "vscode": "^1.85.0"
