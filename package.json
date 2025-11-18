@@ -3,6 +3,9 @@
     "type": "git",
     "url": "https://github.com/washcycle/armada-vscode"
   },
+  "bugs": {
+    "url": "https://github.com/washcycle/armada-vscode/issues"
+  },
   "name": "armada-vscode",
   "displayName": "Armada",
   "description": "VSCode extension for Armada - Kubernetes batch job scheduler",
@@ -11,9 +14,17 @@
   "engines": {
     "vscode": "^1.85.0"
   },
+  "author": {
+    "name": "Matt Landowski"
+  },
   "categories": [
     "Other"
   ],
+  "icon": "resources/armada-icon.png",
+  "galleryBanner": {
+    "color": "#C80000",
+    "theme": "dark"
+  },
   "keywords": [
     "armada",
     "kubernetes",
@@ -21,6 +32,7 @@
     "jobs",
     "scheduler"
   ],
+  "pricing": "Free",
   "activationEvents": [
     "onLanguage:yaml"
   ],
