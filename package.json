@@ -1,0 +1,251 @@
+{
+  "name": "armada-vscode",
+  "displayName": "Armada",
+  "description": "VSCode extension for Armada - Kubernetes batch job scheduler",
+  "version": "0.1.0",
+  "publisher": "armada",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "armada",
+    "kubernetes",
+    "batch",
+    "jobs",
+    "scheduler"
+  ],
+  "activationEvents": [
+    "onLanguage:yaml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "armada.submitJob",
+        "title": "Armada: Submit Job",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "armada.refreshJobs",
+        "title": "Armada: Refresh Jobs",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "armada.refreshJobsQueryAPI",
+        "title": "Armada: Refresh Jobs (Query API)",
+        "icon": "$(database)"
+      },
+      {
+        "command": "armada.setupConfig",
+        "title": "Armada: Setup Configuration",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "armada.switchContext",
+        "title": "Armada: Switch Context",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "armada.cancelJob",
+        "title": "Armada: Cancel Job",
+        "icon": "$(close)"
+      },
+      {
+        "command": "armada.viewJobLogs",
+        "title": "Armada: View Job Logs",
+        "icon": "$(output)"
+      },
+      {
+        "command": "armada.browseQueues",
+        "title": "Armada: Browse Queues",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "armada.browseActiveQueues",
+        "title": "Armada: Browse Active Queues",
+        "icon": "$(search)"
+      },
+      {
+        "command": "armada.loadJobSet",
+        "title": "Armada: Load Job Set",
+        "icon": "$(add)"
+      },
+      {
+        "command": "armada.browseJobSets",
+        "title": "Armada: Browse Job Sets",
+        "icon": "$(list-filter)"
+      },
+      {
+        "command": "armada.clearMonitoredJobSets",
+        "title": "Armada: Clear All Monitored Job Sets",
+        "icon": "$(clear-all)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "armada",
+          "title": "Armada",
+          "icon": "resources/armada-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "armada": [
+        {
+          "id": "armadaJobsView",
+          "name": "Jobs",
+          "contextualTitle": "Armada Jobs"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "armadaJobsView",
+        "contents": "No Armada configuration found.\n[Setup Configuration](command:armada.setupConfig)",
+        "when": "!armada.configured"
+      },
+      {
+        "view": "armadaJobsView",
+        "contents": "No jobs to display.\n\nSubmit a job from a YAML file or use the [Submit Job](command:armada.submitJob) command.",
+        "when": "armada.configured"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "armada.browseJobSets",
+          "when": "view == armadaJobsView",
+          "group": "navigation"
+        },
+        {
+          "command": "armada.browseActiveQueues",
+          "when": "view == armadaJobsView",
+          "group": "navigation"
+        },
+        {
+          "command": "armada.loadJobSet",
+          "when": "view == armadaJobsView",
+          "group": "navigation"
+        },
+        {
+          "command": "armada.refreshJobs",
+          "when": "view == armadaJobsView",
+          "group": "navigation"
+        },
+        {
+          "command": "armada.refreshJobsQueryAPI",
+          "when": "view == armadaJobsView",
+          "group": "navigation"
+        },
+        {
+          "command": "armada.switchContext",
+          "when": "view == armadaJobsView",
+          "group": "navigation"
+        },
+        {
+          "command": "armada.clearMonitoredJobSets",
+          "when": "view == armadaJobsView"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "armada.viewJobLogs",
+          "when": "view == armadaJobsView && viewItem == job",
+          "group": "inline"
+        },
+        {
+          "command": "armada.viewJobLogs",
+          "when": "view == armadaJobsView && viewItem == job",
+          "group": "armada@1"
+        },
+        {
+          "command": "armada.cancelJob",
+          "when": "view == armadaJobsView && viewItem == job",
+          "group": "armada@2"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "armada.submitJob",
+          "when": "resourceExtname == .yaml && resourceFilename =~ /armada/",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "armada.submitJob",
+          "when": "resourceExtname == .yaml || resourceExtname == .yml",
+          "group": "armada@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Armada",
+      "properties": {
+        "armada.configPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to armadactl config file (default: ~/.armadactl.yaml)"
+        },
+        "armada.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh job status"
+        },
+        "armada.refreshInterval": {
+          "type": "number",
+          "default": 5000,
+          "description": "Auto-refresh interval in milliseconds"
+        },
+        "armada.maxJobsToShow": {
+          "type": "number",
+          "default": 100,
+          "description": "Maximum number of jobs to display"
+        }
+      }
+    },
+    "yamlValidation": [
+      {
+        "fileMatch": "*.armada.yaml",
+        "url": "./schemas/armada-job-schema.json"
+      },
+      {
+        "fileMatch": "*.armada.yml",
+        "url": "./schemas/armada-job-schema.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./ && npm run copy-proto",
+    "copy-proto": "mkdir -p out/proto && cp -r src/proto/* out/proto/",
+    "download-protos": "bash scripts/download-protos.sh",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.18.1",
+    "@typescript-eslint/parser": "^8.18.1",
+    "@vscode/test-electron": "^2.4.1",
+    "eslint": "^9.17.0",
+    "glob": "^11.0.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.4",
+    "@grpc/proto-loader": "^0.7.13",
+    "js-yaml": "^4.1.0",
+    "protobufjs": "^7.4.0"
+  }
+}

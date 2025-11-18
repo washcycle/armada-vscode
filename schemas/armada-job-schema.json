@@ -1,0 +1,361 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Armada Job Specification",
+  "description": "Schema for Armada batch job submission",
+  "type": "object",
+  "required": ["queue", "jobSetId", "jobs"],
+  "properties": {
+    "queue": {
+      "type": "string",
+      "description": "The queue to submit the job to",
+      "minLength": 1
+    },
+    "jobSetId": {
+      "type": "string",
+      "description": "Group identifier for bulk operations like cancel/watch",
+      "minLength": 1
+    },
+    "jobs": {
+      "type": "array",
+      "description": "Array of jobs to submit",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/job"
+      }
+    }
+  },
+  "definitions": {
+    "job": {
+      "type": "object",
+      "required": ["podSpecs"],
+      "properties": {
+        "priority": {
+          "type": "number",
+          "description": "Job priority (lower value = higher priority)",
+          "default": 0
+        },
+        "namespace": {
+          "type": "string",
+          "description": "Kubernetes namespace for the pod"
+        },
+        "clientId": {
+          "type": "string",
+          "description": "Client-provided ID for deduplication"
+        },
+        "labels": {
+          "type": "object",
+          "description": "Custom labels for the job",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Custom annotations for the job",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "requiredNodeLabels": {
+          "type": "object",
+          "description": "Required node labels for scheduling",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "scheduler": {
+          "type": "string",
+          "description": "Scheduler to use for this job"
+        },
+        "podSpecs": {
+          "type": "array",
+          "description": "Array of Kubernetes pod specifications",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/podSpec"
+          }
+        },
+        "ingress": {
+          "type": "array",
+          "description": "Ingress configurations",
+          "items": {
+            "$ref": "#/definitions/ingress"
+          }
+        },
+        "services": {
+          "type": "array",
+          "description": "Service configurations",
+          "items": {
+            "$ref": "#/definitions/service"
+          }
+        }
+      }
+    },
+    "podSpec": {
+      "type": "object",
+      "description": "Kubernetes Pod Spec",
+      "required": ["containers"],
+      "properties": {
+        "terminationGracePeriodSeconds": {
+          "type": "integer",
+          "description": "Grace period for pod termination",
+          "default": 30
+        },
+        "restartPolicy": {
+          "type": "string",
+          "description": "Pod restart policy",
+          "enum": ["Always", "OnFailure", "Never"],
+          "default": "Never"
+        },
+        "containers": {
+          "type": "array",
+          "description": "Container specifications",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/container"
+          }
+        },
+        "nodeSelector": {
+          "type": "object",
+          "description": "Node selector labels",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "description": "Pod tolerations",
+          "items": {
+            "type": "object"
+          }
+        },
+        "affinity": {
+          "type": "object",
+          "description": "Pod affinity rules"
+        }
+      }
+    },
+    "container": {
+      "type": "object",
+      "required": ["name", "image"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Container name",
+          "minLength": 1
+        },
+        "image": {
+          "type": "string",
+          "description": "Container image",
+          "minLength": 1
+        },
+        "imagePullPolicy": {
+          "type": "string",
+          "description": "Image pull policy",
+          "enum": ["Always", "Never", "IfNotPresent"],
+          "default": "IfNotPresent"
+        },
+        "command": {
+          "type": "array",
+          "description": "Container entrypoint",
+          "items": {
+            "type": "string"
+          }
+        },
+        "args": {
+          "type": "array",
+          "description": "Container arguments",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "type": "array",
+          "description": "Environment variables",
+          "items": {
+            "$ref": "#/definitions/envVar"
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/resources",
+          "description": "Resource requirements"
+        },
+        "ports": {
+          "type": "array",
+          "description": "Container ports",
+          "items": {
+            "$ref": "#/definitions/containerPort"
+          }
+        },
+        "volumeMounts": {
+          "type": "array",
+          "description": "Volume mounts",
+          "items": {
+            "type": "object"
+          }
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Security context",
+          "properties": {
+            "runAsUser": {
+              "type": "integer"
+            },
+            "runAsGroup": {
+              "type": "integer"
+            },
+            "privileged": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "envVar": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Environment variable name"
+        },
+        "value": {
+          "type": "string",
+          "description": "Environment variable value"
+        },
+        "valueFrom": {
+          "type": "object",
+          "description": "Source for the environment variable value"
+        }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "description": "Resource limits",
+          "properties": {
+            "cpu": {
+              "type": ["string", "number"],
+              "description": "CPU limit (e.g., '1', '500m', 0.5)"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory limit (e.g., '1Gi', '512Mi')"
+            },
+            "nvidia.com/gpu": {
+              "type": ["string", "number"],
+              "description": "GPU limit"
+            }
+          }
+        },
+        "requests": {
+          "type": "object",
+          "description": "Resource requests",
+          "properties": {
+            "cpu": {
+              "type": ["string", "number"],
+              "description": "CPU request (e.g., '1', '500m', 0.5)"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory request (e.g., '1Gi', '512Mi')"
+            },
+            "nvidia.com/gpu": {
+              "type": ["string", "number"],
+              "description": "GPU request"
+            }
+          }
+        }
+      }
+    },
+    "containerPort": {
+      "type": "object",
+      "required": ["containerPort"],
+      "properties": {
+        "containerPort": {
+          "type": "integer",
+          "description": "Port number",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Protocol",
+          "enum": ["TCP", "UDP"],
+          "default": "TCP"
+        },
+        "name": {
+          "type": "string",
+          "description": "Port name"
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "required": ["type", "ports"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Ingress type",
+          "enum": ["NodePort", "LoadBalancer"]
+        },
+        "ports": {
+          "type": "array",
+          "description": "Ports to expose",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
+          }
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["name", "ports"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Service name"
+        },
+        "ports": {
+          "type": "array",
+          "description": "Service ports",
+          "items": {
+            "$ref": "#/definitions/servicePort"
+          }
+        }
+      }
+    },
+    "servicePort": {
+      "type": "object",
+      "required": ["port"],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "description": "Service port",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "targetPort": {
+          "type": "integer",
+          "description": "Target port",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "protocol": {
+          "type": "string",
+          "description": "Protocol",
+          "enum": ["TCP", "UDP"],
+          "default": "TCP"
+        },
+        "name": {
+          "type": "string",
+          "description": "Port name"
+        }
+      }
+    }
+  }
+}
