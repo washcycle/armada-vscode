@@ -1,0 +1,10 @@
+# Sample armadactl config for the local kind cluster
+# Copy this to ~/.armadactl.yaml to use with the VSCode extension
+# or run: cp operator/quickstart/armadactl.yaml ~/.armadactl.yaml
+
+currentContext: kind-armada
+
+contexts:
+  kind-armada:
+    armadaUrl: "localhost:30002"  # gRPC endpoint
+    # No authentication needed - anonymousAuth is enabled in the demo

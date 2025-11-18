@@ -1,0 +1,26 @@
+# Override the full name to remove the release name prefix
+fullnameOverride: "postgres"
+
+# Authentication configuration
+auth:
+  postgresPassword: "psw"
+  database: "armada"
+  username: "armada"
+  password: "armada"
+
+# Custom initialization scripts
+primary:
+  initdb:
+    scripts:
+      init-databases.sql: |
+        -- Create additional databases for Armada components
+        CREATE DATABASE scheduler;
+        CREATE DATABASE lookout;
+
+  # Resource configuration for development
+  resourcesPreset: "nano"
+
+  # Persistence settings
+  persistence:
+    enabled: true
+    size: 2Gi

@@ -1,0 +1,27 @@
+---
+# ClusterRole to allow Binoculars to read pod logs across all namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: armada-binoculars-logs-reader
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
+---
+# ClusterRoleBinding to grant the permissions to the Binoculars service account
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: armada-binoculars-logs-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: armada-binoculars-logs-reader
+subjects:
+- kind: ServiceAccount
+  name: armada-binoculars
+  namespace: armada

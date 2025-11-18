@@ -1,0 +1,94 @@
+queue: test-queue
+jobSetId: advanced-example
+jobs:
+  # Job 1: Multi-container pod with resources
+  - priority: 100
+    namespace: default
+    clientId: job-1-unique-id
+    labels:
+      app: data-processor
+      tier: backend
+    annotations:
+      description: "Processes data files"
+    podSpecs:
+      - terminationGracePeriodSeconds: 30
+        restartPolicy: Never
+        containers:
+          # Main processing container
+          - name: processor
+            image: python:3.11-slim
+            imagePullPolicy: IfNotPresent
+            command:
+              - python
+              - "-c"
+            args:
+              - |
+                import time
+                print("Processing data...")
+                time.sleep(10)
+                print("Done!")
+            env:
+              - name: LOG_LEVEL
+                value: "INFO"
+              - name: BATCH_SIZE
+                value: "100"
+            resources:
+              limits:
+                memory: 2Gi
+                cpu: 2
+              requests:
+                memory: 1Gi
+                cpu: 1
+            ports:
+              - containerPort: 8080
+                protocol: TCP
+                name: http
+
+          # Sidecar logging container
+          - name: logger
+            image: busybox:latest
+            imagePullPolicy: IfNotPresent
+            command:
+              - sh
+              - "-c"
+            args:
+              - "while true; do echo 'Logging...'; sleep 5; done"
+            resources:
+              limits:
+                memory: 128Mi
+                cpu: 100m
+              requests:
+                memory: 64Mi
+                cpu: 50m
+
+  # Job 2: GPU job with node requirements
+  - priority: 50
+    namespace: gpu-jobs
+    labels:
+      app: ml-training
+      gpu: "true"
+    requiredNodeLabels:
+      node-type: gpu
+      gpu-type: nvidia-a100
+    podSpecs:
+      - restartPolicy: OnFailure
+        containers:
+          - name: trainer
+            image: tensorflow/tensorflow:latest-gpu
+            imagePullPolicy: IfNotPresent
+            command:
+              - python
+            args:
+              - train.py
+            resources:
+              limits:
+                memory: 16Gi
+                cpu: 8
+                nvidia.com/gpu: 1
+              requests:
+                memory: 8Gi
+                cpu: 4
+                nvidia.com/gpu: 1
+            securityContext:
+              runAsUser: 1000
+              runAsGroup: 1000

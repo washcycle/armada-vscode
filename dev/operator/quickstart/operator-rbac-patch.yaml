@@ -1,0 +1,123 @@
+# This patch adds comprehensive cluster-wide permissions to the operator's ClusterRole
+# to allow it to manage all Armada resources and related Kubernetes resources.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: armada-operator-manager-role
+rules:
+# RBAC permissions
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterroles
+  - clusterrolebindings
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+  - escalate
+  - bind
+# Core resources
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  - services
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Apps resources
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Batch resources
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Networking resources
+- apiGroups:
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Policy resources
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Armada install resources
+- apiGroups:
+  - install.armadaproject.io
+  resources:
+  - armadaservers
+  - schedulers
+  - executors
+  - binoculars
+  - lookouts
+  - lookoutingesters
+  - eventingesters
+  - scheduleringesters
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+# Armada core resources
+- apiGroups:
+  - core.armadaproject.io
+  resources:
+  - queues
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete

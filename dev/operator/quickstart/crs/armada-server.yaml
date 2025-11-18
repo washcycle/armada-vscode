@@ -1,0 +1,48 @@
+apiVersion: install.armadaproject.io/v1alpha1
+kind: ArmadaServer
+metadata:
+  name: armada-server
+  namespace: armada
+spec:
+  pulsarInit: false
+  replicas: 1
+  image:
+    repository: gresearch/armada-server
+    tag: latest
+  applicationConfig:
+    httpNodePort: 30001
+    grpcNodePort: 30002
+    schedulerApiConnection:
+      armadaUrl: "armada-scheduler.armada.svc.cluster.local:50051"
+      forceNoTls: true
+    corsAllowedOrigins:
+      - "http://localhost:3000"
+      - "http://localhost:8089"
+      - "http://localhost:10000"
+      - "http://localhost:30000"
+      - "http://localhost:30002"
+      - "http://localhost:30001"
+    auth:
+      anonymousAuth: true
+      permissionGroupMapping:
+        submit_any_jobs: ["everyone"]
+        create_queue: ["everyone"]
+        delete_queue: ["everyone"]
+        cancel_any_jobs: ["everyone"]
+        reprioritize_any_jobs: ["everyone"]
+        watch_all_events: ["everyone"]
+    postgres:
+      connection:
+        host: postgres.data.svc.cluster.local
+        port: 5432
+        user: armada
+        password: armada
+        dbname: lookout
+        sslmode: disable
+    pulsar:
+      URL: pulsar://pulsar-broker.data.svc.cluster.local:6650
+    eventsApiRedis:
+      addrs:
+        - redis.data.svc.cluster.local:6379
+      password: ""
+      db: 0

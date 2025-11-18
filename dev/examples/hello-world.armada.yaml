@@ -1,0 +1,26 @@
+queue: test
+jobSetId: hello-world-job-set
+jobs:
+  - priority: 0
+    namespace: default
+    labels:
+      app: hello-world
+      environment: test
+    podSpecs:
+      - terminationGracePeriodSeconds: 0
+        restartPolicy: Never
+        containers:
+          - name: hello-world
+            image: busybox:latest
+            imagePullPolicy: IfNotPresent
+            command:
+              - echo
+            args:
+              - "Hello from Armada!"
+            resources:
+              limits:
+                memory: 64Mi
+                cpu: 150m
+              requests:
+                memory: 64Mi
+                cpu: 150m

@@ -1,0 +1,32 @@
+apiVersion: install.armadaproject.io/v1alpha1
+kind: Lookout
+metadata:
+  name: armada-lookout
+  namespace: armada
+spec:
+  replicas: 1
+  image:
+    repository: gresearch/armada-lookout
+    tag: latest
+  prometheus:
+    enabled: true
+  applicationConfig:
+    httpNodePort: 30000
+    # See https://github.com/armadaproject/armada/blob/master/config/lookoutv2/config.yaml
+    # for the full list of configuration options.
+    apiPort: 8080
+    corsAllowedOrigins:
+      - "http://localhost:30003"
+    uiConfig:
+      backend: "jsonb"
+      customTitle: "Local Dev"
+      armadaApiBaseUrl: "http://localhost:30001"
+      binocularsBaseUrlPattern: "http://localhost:30003"
+    postgres:
+      connection:
+        host: postgres.data.svc.cluster.local
+        port: 5432
+        user: armada
+        password: armada
+        dbname: lookout
+        sslmode: disable

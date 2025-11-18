@@ -1,0 +1,6 @@
+fullnameOverride: "redis"
+replicas: 2
+hardAntiAffinity: false
+master:
+  extraFlags:
+    - --min-replicas-to-write 0

@@ -1,0 +1,15 @@
+apiVersion: install.armadaproject.io/v1alpha1
+kind: Executor
+metadata:
+  name: armada-executor
+  namespace: armada
+spec:
+  image:
+    repository: gresearch/armada-executor
+    tag: latest
+  applicationConfig:
+    executorApiConnection:
+      armadaUrl: armada-scheduler.armada.svc.cluster.local:50051
+      forceNoTls: true
+    metric:
+      port: 9001

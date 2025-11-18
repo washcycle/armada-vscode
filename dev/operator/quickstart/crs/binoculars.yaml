@@ -1,0 +1,33 @@
+apiVersion: install.armadaproject.io/v1alpha1
+kind: Binoculars
+metadata:
+  name: armada-binoculars
+  namespace: armada
+spec:
+  replicas: 1
+  image:
+    repository: gresearch/armada-binoculars
+    tag: latest
+  hostNames:
+    - localhost-binoculars
+  clusterIssuer: ""
+  ingress:
+    ingressClass: "nginx"
+  prometheus:
+    enabled: true
+  applicationConfig:
+    httpNodePort: 30003
+    grpcNodePort: 30004
+    grpcPort: 50053
+    httpPort: 8084
+    metricsPort: 9007
+    corsAllowedOrigins:
+      - "http://localhost:3000"
+      - "http://localhost:8089"
+      - "http://localhost:10000"
+      - "http://localhost:30000"
+      - "http://localhost:30001"
+      - "http://localhost:30002"
+      - "http://localhost:30003"
+    auth:
+      anonymousAuth: true
