@@ -18,6 +18,7 @@ A Visual Studio Code extension for [Armada](https://armadaproject.io/), the mult
 ### From VSIX (Development)
 
 1. Package the extension:
+
    ```bash
    npm install
    npm run compile
@@ -51,6 +52,7 @@ contexts:
 
 1. Create a file with `.armada.yaml` extension (e.g., `hello-world.armada.yaml`)
 2. Write your job definition:
+
    ```yaml
    queue: default
    jobSetId: my-job-set
@@ -63,6 +65,7 @@ contexts:
              image: busybox
              command: ["echo", "Hello from Armada!"]
    ```
+
 3. Click the cloud upload icon in the editor or run `Armada: Submit Job`
 
 ### 3. Monitor Jobs
@@ -114,11 +117,11 @@ make logs    # View operator logs
 make down    # Tear down the cluster
 ```
 
-This creates a local Kubernetes cluster with Armada installed and ready to use. See [`dev/operator/README.md`](dev/operator/README.md) for details.
+This creates a local Kubernetes cluster with Armada installed and ready to use. See [`operator/README.md`](operator/README.md) for details.
 
 ## Development
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development instructions.
+See [`DEVELOPMENT.md`](DEVELOPMENT.md) for detailed development instructions.
 
 ### Quick Development Setup
 
@@ -163,18 +166,18 @@ armada-vscode/
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome! Please see [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines.
 
 ## Resources
 
 - [Armada Documentation](https://armadaproject.io/docs)
 - [Armada GitHub](https://github.com/armadaproject/armada)
 - [VSCode Extension API](https://code.visualstudio.com/api)
-- [Issue Tracker](https://github.com/armadaproject/armada-vscode/issues)
+- [Issue Tracker](https://github.com/washcycle/armada-vscode/issues)
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+See [`LICENSE`](LICENSE) for details.
 
 ## Support
 
