@@ -30,10 +30,6 @@ A Visual Studio Code extension for [Armada](https://armadaproject.io/), the mult
    - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS)
    - Type "Install from VSIX" and select the file
 
-### From Marketplace
-
-*Coming soon*
-
 ## Quick Start
 
 ### 1. Configure Armada Connection
