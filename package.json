@@ -34,7 +34,8 @@
   ],
   "pricing": "Free",
   "activationEvents": [
-    "onLanguage:yaml"
+    "onLanguage:yaml",
+    "onView:armadaJobsView"
   ],
   "main": "./out/extension.js",
   "contributes": {
