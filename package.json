@@ -35,7 +35,19 @@
   "pricing": "Free",
   "activationEvents": [
     "onLanguage:yaml",
-    "onView:armadaJobsView"
+    "onView:armadaJobsView",
+    "onCommand:armada.submitJob",
+    "onCommand:armada.refreshJobs",
+    "onCommand:armada.refreshJobsQueryAPI",
+    "onCommand:armada.setupConfig",
+    "onCommand:armada.switchContext",
+    "onCommand:armada.cancelJob",
+    "onCommand:armada.viewJobLogs",
+    "onCommand:armada.browseQueues",
+    "onCommand:armada.browseActiveQueues",
+    "onCommand:armada.loadJobSet",
+    "onCommand:armada.browseJobSets",
+    "onCommand:armada.clearMonitoredJobSets"
   ],
   "main": "./out/extension.js",
   "contributes": {
