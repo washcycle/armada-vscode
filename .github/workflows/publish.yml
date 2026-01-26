@@ -29,6 +29,8 @@ jobs:
 
       - name: Run tests
         run: npm run test
+        # TODO: Remove continue-on-error once tests are implemented
+        # Currently there are no tests, so this step would fail
         continue-on-error: true
 
       - name: Install vsce
