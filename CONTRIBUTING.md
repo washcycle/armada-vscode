@@ -107,12 +107,44 @@ armada-vscode/
 ## Pull Request Process
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Create a feature branch from `dev` (`git checkout -b feature/amazing-feature`)
 3. Make your changes
 4. Run linter: `npm run lint`
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to your branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
+5. Run tests: `npm run test`
+6. Compile: `npm run compile`
+7. Commit your changes using [Conventional Commits](https://www.conventionalcommits.org/) format:
+   ```bash
+   git commit -m 'feat: add amazing feature'
+   # or
+   git commit -m 'fix: resolve issue with job cancellation'
+   ```
+8. Push to your branch (`git push origin feature/amazing-feature`)
+9. Open a Pull Request to the `dev` branch
+10. Wait for CI checks to pass
+
+### Conventional Commit Format
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) for automatic versioning and changelog generation:
+
+- `feat:` - New feature (minor version bump)
+- `fix:` - Bug fix (patch version bump)
+- `docs:` - Documentation changes
+- `chore:` - Maintenance tasks
+- `refactor:` - Code refactoring
+- `test:` - Test additions or changes
+- `perf:` - Performance improvements
+
+For breaking changes, add `!` after the type: `feat!: redesign configuration API`
+
+### CI/CD Pipeline
+
+All pull requests trigger the CI workflow which:
+- Runs ESLint
+- Compiles TypeScript
+- Runs tests
+- Packages the extension
+
+Merging to `main` triggers the release-please workflow which creates release PRs with automated versioning.
 
 ## Adding New Features
 

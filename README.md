@@ -134,6 +134,25 @@ npm run watch
 # Press F5 in VSCode to launch Extension Development Host
 ```
 
+## CI/CD
+
+This project uses GitHub Actions for automated building, testing, and publishing:
+
+- **CI Workflow**: Automatically runs on pull requests to validate code quality, run tests, and build the extension
+- **Release Please**: Manages versioning and changelogs using [Conventional Commits](https://www.conventionalcommits.org/)
+- **Publish Workflow**: Automatically publishes new releases to the VS Code Marketplace
+
+See [`.github/workflows/README.md`](.github/workflows/README.md) for detailed workflow documentation.
+
+### Release Process
+
+1. Make changes on feature branches
+2. Create PR to `dev` branch with conventional commit messages
+3. Merge approved PRs to `dev`
+4. Merge `dev` to `main` when ready for release
+5. Release Please creates a release PR with auto-generated changelog
+6. Merge the release PR to trigger publication to the marketplace
+
 ## Project Structure
 
 ```
