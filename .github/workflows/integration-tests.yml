@@ -1,0 +1,115 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget curl
+
+      - name: Setup Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install kubectl
+        run: |
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/
+          kubectl version --client
+
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          kind version
+
+      - name: Setup Armada with kind
+        working-directory: dev
+        run: |
+          echo "Setting up Armada cluster..."
+          make up
+          echo "Waiting for Armada to be ready..."
+          sleep 30
+          make status
+        timeout-minutes: 30
+
+      - name: Verify Armada is running
+        run: |
+          echo "Checking Armada pods..."
+          kubectl --context kind-armada get pods -n armada-system
+          kubectl --context kind-armada get pods -n armada
+          echo "Checking NodePort services..."
+          kubectl --context kind-armada get svc -n armada
+
+      - name: Setup test configuration
+        run: |
+          mkdir -p $HOME/.config
+          cat > $HOME/.armadactl.yaml <<EOF
+          currentContext: test
+          contexts:
+            - name: test
+              armadaUrl: localhost:30002
+              execTimeout: 2m
+          EOF
+          cat $HOME/.armadactl.yaml
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run Integration Tests
+        run: |
+          echo "Running integration tests..."
+          xvfb-run -a npm test
+        env:
+          DISPLAY: ':99.0'
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== Armada System Pods ==="
+          kubectl --context kind-armada get pods -n armada-system
+          echo "=== Armada Pods ==="
+          kubectl --context kind-armada get pods -n armada
+          echo "=== Data Pods ==="
+          kubectl --context kind-armada get pods -n data || true
+          echo "=== Armada Operator Logs ==="
+          kubectl --context kind-armada logs -n armada-system deployment/armada-operator-controller-manager --tail=100 || true
+          echo "=== Kind cluster info ==="
+          kind get clusters
+          kubectl --context kind-armada cluster-info
+
+      - name: Cleanup
+        if: always()
+        working-directory: dev
+        run: |
+          echo "Cleaning up Armada cluster..."
+          make down || true
