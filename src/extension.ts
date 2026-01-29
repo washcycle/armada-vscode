@@ -16,6 +16,7 @@ import { loadJobSetCommand } from './commands/loadJobSet';
 import { viewJobLogsCommand } from './commands/viewJobLogs';
 import { browseJobSetsCommand } from './commands/browseJobSets';
 import { clearMonitoredJobSetsCommand } from './commands/clearMonitoredJobSets';
+import { createQueueCommand } from './commands/createQueue';
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Armada extension is now active');
@@ -179,6 +180,12 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('armada.clearMonitoredJobSets', () =>
             clearMonitoredJobSetsCommand(jobTreeProvider)
+        )
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('armada.createQueue', () =>
+            createQueueCommand(armadaClient, jobTreeProvider)
         )
     );
 

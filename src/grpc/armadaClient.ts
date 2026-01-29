@@ -296,6 +296,24 @@ export class ArmadaClient {
     }
 
     /**
+     * Create a new queue
+     */
+    async createQueue(queue: any): Promise<void> {
+        this.initializeClients();
+        return new Promise((resolve, reject) => {
+            this.submitClient.CreateQueue(queue, (error: any, response: any) => {
+                if (error) {
+                    reject(new Error(`Failed to create queue: ${error.message}`));
+                    return;
+                }
+
+                console.log('[Armada] Queue created successfully:', queue.name);
+                resolve();
+            });
+        });
+    }
+
+    /**
      * Stream job events for a job set
      */
     streamJobSetEvents(

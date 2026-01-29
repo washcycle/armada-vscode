@@ -47,7 +47,8 @@
     "onCommand:armada.browseActiveQueues",
     "onCommand:armada.loadJobSet",
     "onCommand:armada.browseJobSets",
-    "onCommand:armada.clearMonitoredJobSets"
+    "onCommand:armada.clearMonitoredJobSets",
+    "onCommand:armada.createQueue"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -111,6 +112,11 @@
         "command": "armada.clearMonitoredJobSets",
         "title": "Armada: Clear All Monitored Job Sets",
         "icon": "$(clear-all)"
+      },
+      {
+        "command": "armada.createQueue",
+        "title": "Armada: Create Queue",
+        "icon": "$(add)"
       }
     ],
     "viewsContainers": {
