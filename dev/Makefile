@@ -1,4 +1,4 @@
-.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces
+.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces create-test-queue
 
 KIND_CLUSTER_NAME ?= armada
 KIND_CONTEXT := kind-$(KIND_CLUSTER_NAME)
@@ -110,3 +110,7 @@ apply-armada-crs: ## Apply the Armada CRs that stand up the demo install
 
 delete-armada-crs: ## Delete the demo Armada CRs
 	kubectl --context $(KIND_CONTEXT) delete -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR) --ignore-not-found
+
+create-test-queue: ## Create a test queue for integration testing
+	@echo "Creating test queue..."
+	@bash scripts/create-test-queue.sh

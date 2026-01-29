@@ -80,6 +80,12 @@ jobs:
           echo "Checking NodePort services..."
           kubectl --context kind-armada get svc -n armada
 
+      - name: Create test queue
+        working-directory: dev
+        run: |
+          echo "Creating test queue for integration tests..."
+          bash scripts/create-test-queue.sh
+
       - name: Setup test configuration
         run: |
           mkdir -p $HOME/.config
