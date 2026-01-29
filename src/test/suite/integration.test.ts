@@ -188,16 +188,8 @@ suite('Armada Extension Integration Tests', () => {
         const editor = await openTestYamlFile('test-job.armada.yaml');
 
         try {
-            // Execute the submit job command
-            // Note: This command shows a confirmation dialog which will timeout in non-interactive environments
-            // Wrap in a race with a timeout to detect this scenario
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Command timeout - likely waiting for user interaction')), 10000)
-            );
-
-            const commandPromise = executeCommand('armada.submitJob');
-
-            await Promise.race([commandPromise, timeoutPromise]);
+            // Execute the submit job command with skipConfirmation to avoid dialog timeout in CI
+            await executeCommand('armada.submitJob', { skipConfirmation: true });
 
             // Wait a bit for the job to be submitted
             await sleep(2000);
@@ -205,11 +197,8 @@ suite('Armada Extension Integration Tests', () => {
             // Command execution should not throw - success expected
             assert.ok(true, 'Submit job command executed successfully');
         } catch (error: any) {
-            // Skip if it's waiting for user interaction (dialog timeout)
-            if (error.message && error.message.includes('Command timeout')) {
-                console.log('Submit job test skipped - command requires user interaction (confirmation dialog)');
-                this.skip();
-            } else if (error.message && (error.message.includes('not configured') || error.message.includes('connection'))) {
+            // Only skip for known configuration/connection issues
+            if (error.message && (error.message.includes('not configured') || error.message.includes('connection'))) {
                 console.log('Submit job test skipped - Armada not accessible:', error.message);
                 this.skip();
             } else {

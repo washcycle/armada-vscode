@@ -93,8 +93,8 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand('armada.submitJob', () =>
-            submitJobCommand(armadaClient, configManager, jobTreeProvider)
+        vscode.commands.registerCommand('armada.submitJob', (options?: { skipConfirmation?: boolean }) =>
+            submitJobCommand(armadaClient, configManager, jobTreeProvider, options)
         )
     );
 
