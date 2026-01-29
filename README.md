@@ -176,7 +176,7 @@ armada-vscode/
 ## Requirements
 
 - VSCode 1.85.0 or higher
-- Node.js 18.x or higher
+- Node.js 20.x or higher (for development)
 - Access to an Armada cluster (or use the local development setup)
 
 ## Contributing

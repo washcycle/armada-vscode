@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 ### Prerequisites
 
-- Node.js 16+ and npm
+- Node.js 20.x or higher and npm
 - VSCode 1.85.0 or higher
 - (Optional) kind + kubectl + helm (to run the Armada Operator demo cluster)
 
