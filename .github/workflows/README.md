@@ -76,6 +76,12 @@ To enable automatic publishing to the VS Code Marketplace, you need to:
    - Value: Paste your Personal Access Token
    - Click "Add secret"
 
+3. **Configure the production environment** (recommended):
+   - Go to your GitHub repository → Settings → Environments
+   - Create a new environment named `production`
+   - (Optional) Add required reviewers to approve deployments
+   - (Optional) Add deployment branches rule to restrict which branches can deploy
+
 ### For Release Please
 
 No additional setup required - uses the default `GITHUB_TOKEN` with appropriate permissions.

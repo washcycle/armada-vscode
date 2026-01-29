@@ -7,12 +7,16 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Add environment for additional protection before publishing
+    environment: production
     permissions:
       contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -44,4 +48,4 @@ jobs:
       - name: Publish to Visual Studio Marketplace
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: vsce publish -p $VSCE_PAT
+        run: vsce publish -p "$VSCE_PAT"
