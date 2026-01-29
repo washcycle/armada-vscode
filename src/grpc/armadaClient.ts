@@ -2,7 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
 import { ResolvedConfig } from '../types/config';
-import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage } from '../types/armada';
+import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue } from '../types/armada';
 
 export class ArmadaClient {
     private submitClient: any;
@@ -298,7 +298,7 @@ export class ArmadaClient {
     /**
      * Create a new queue
      */
-    async createQueue(queue: any): Promise<void> {
+    async createQueue(queue: Queue): Promise<void> {
         this.initializeClients();
         return new Promise((resolve, reject) => {
             this.submitClient.CreateQueue(queue, (error: any, response: any) => {

@@ -1,10 +1,8 @@
 import * as vscode from 'vscode';
 import { ArmadaClient } from '../grpc/armadaClient';
-import { JobTreeProvider } from '../providers/jobTreeProvider';
 
 export async function createQueueCommand(
-    client: ArmadaClient | undefined,
-    jobTreeProvider?: JobTreeProvider
+    client: ArmadaClient | undefined
 ): Promise<void> {
     if (!client) {
         vscode.window.showWarningMessage('Armada is not configured');
