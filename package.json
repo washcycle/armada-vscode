@@ -269,15 +269,15 @@
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
     "@vscode/test-electron": "^2.4.1",
-    "eslint": "^9.17.0",
-    "glob": "^11.0.0",
     "mocha": "^10.3.0",
+    "eslint": "^9.39.2",
+    "glob": "^13.0.0",
     "typescript": "^5.7.2"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.12.4",
-    "@grpc/proto-loader": "^0.7.13",
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
     "js-yaml": "^4.1.0",
-    "protobufjs": "^7.4.0"
+    "protobufjs": "^8.0.0"
   }
 }
