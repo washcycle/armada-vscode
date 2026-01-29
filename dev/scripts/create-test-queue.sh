@@ -3,19 +3,39 @@
 
 set -e
 
-KUBE_CONTEXT="${KUBE_CONTEXT:-kind-armada}"
-QUEUE_YAML="${QUEUE_YAML:-operator/quickstart/test-queue.yaml}"
+ARMADA_URL="${ARMADA_URL:-localhost:30002}"
+QUEUE_NAME="${QUEUE_NAME:-test}"
 
-echo "Creating test queue using ${QUEUE_YAML}..."
+echo "Creating test queue '${QUEUE_NAME}' on Armada at ${ARMADA_URL}..."
 
-# Apply the queue manifest
-kubectl --context "${KUBE_CONTEXT}" apply -f "${QUEUE_YAML}"
+# Check if armadactl is available
+if ! command -v armadactl &> /dev/null; then
+    echo "Error: armadactl is not installed"
+    exit 1
+fi
+
+# Create armadactl config if it doesn't exist
+if [ ! -f ~/.armadactl.yaml ]; then
+    echo "Creating ~/.armadactl.yaml config..."
+    cat > ~/.armadactl.yaml <<EOF
+currentContext: test
+contexts:
+  - name: test
+    armadaUrl: ${ARMADA_URL}
+    execTimeout: 2m
+EOF
+fi
+
+# Create the queue
+armadactl create queue "${QUEUE_NAME}" \
+    --priority-factor 1.0 \
+    --owners anonymous
 
 echo "✓ Test queue created successfully"
 
-# Wait for queue to be ready
-echo "Waiting for queue to be ready..."
-sleep 2
-
 # Verify queue was created
-kubectl --context "${KUBE_CONTEXT}" get queue -n armada test 2>/dev/null && echo "✓ Queue verified" || echo "⚠ Could not verify queue (may not be created yet)"
+if armadactl get queue "${QUEUE_NAME}" > /dev/null 2>&1; then
+    echo "✓ Queue verified"
+else
+    echo "⚠ Could not verify queue (this may be normal)"
+fi
