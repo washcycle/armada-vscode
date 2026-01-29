@@ -252,7 +252,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./ && npm run copy-proto && npm run copy-test-fixtures",
     "copy-proto": "mkdir -p out/proto && cp -r src/proto/* out/proto/",
-    "copy-test-fixtures": "mkdir -p out/test/fixtures && cp src/test/fixtures/* out/test/fixtures/ 2>/dev/null || true",
+    "copy-test-fixtures": "mkdir -p out/test/fixtures && if [ -d src/test/fixtures ]; then cp src/test/fixtures/* out/test/fixtures/; fi",
     "download-protos": "bash scripts/download-protos.sh",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",

@@ -28,7 +28,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget curl
+          sudo apt-get install -y curl
 
       - name: Setup Docker
         uses: docker/setup-buildx-action@v3
@@ -41,9 +41,9 @@ jobs:
           kubectl version --client
 
       - name: Install Helm
-        run: |
-          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          helm version
+        uses: azure/setup-helm@v4
+        with:
+          version: 'latest'
 
       - name: Install kind
         run: |
@@ -57,10 +57,17 @@ jobs:
         run: |
           echo "Setting up Armada cluster..."
           make up
-          echo "Waiting for Armada to be ready..."
-          sleep 30
-          make status
         timeout-minutes: 30
+
+      - name: Wait for Armada to be ready
+        run: |
+          echo "Waiting for Armada components to be ready..."
+          kubectl --context kind-armada wait --for=condition=Available --timeout=300s -n armada-system deployment/armada-operator-controller-manager || true
+          kubectl --context kind-armada wait --for=condition=Ready --timeout=300s -n armada pods -l app.kubernetes.io/name=armada-server || true
+          echo "Checking final status..."
+          kubectl --context kind-armada get pods -n armada-system
+          kubectl --context kind-armada get pods -n armada || true
+        timeout-minutes: 10
 
       - name: Verify Armada is running
         run: |

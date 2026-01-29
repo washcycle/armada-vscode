@@ -15,8 +15,8 @@ async function main() {
         await runTests({ 
             extensionDevelopmentPath, 
             extensionTestsPath,
-            // Use headless mode for CI
-            launchArgs: ['--disable-extensions', '--disable-gpu']
+            // Use headless mode for CI - disable GPU but keep extensions enabled
+            launchArgs: ['--disable-gpu']
         });
     } catch (err) {
         console.error('Failed to run tests');

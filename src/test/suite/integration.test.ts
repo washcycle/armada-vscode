@@ -25,7 +25,12 @@ suite('Armada Extension Integration Tests', () => {
         // Activate the extension
         if (!ext.isActive) {
             await ext.activate();
-            await sleep(2000); // Give extension time to initialize
+            // Wait for extension to fully activate
+            await waitFor(
+                () => ext.isActive,
+                30000,
+                500
+            );
         }
         
         // Create test configuration
@@ -35,7 +40,7 @@ suite('Armada Extension Integration Tests', () => {
         const config = vscode.workspace.getConfiguration('armada');
         await config.update('configPath', testConfigPath, vscode.ConfigurationTarget.Global);
         
-        // Wait a bit for config to be loaded
+        // Wait for config to be loaded
         await sleep(1000);
         
         console.log('Test suite setup complete');
@@ -175,6 +180,7 @@ suite('Armada Extension Integration Tests', () => {
         
         const available = await isArmadaAvailable();
         if (!available) {
+            console.log('Skipping submit job test - Armada not configured');
             this.skip();
             return;
         }
@@ -189,12 +195,17 @@ suite('Armada Extension Integration Tests', () => {
             // Wait a bit for the job to be submitted
             await sleep(2000);
             
-            // In a real scenario, we'd verify the job was submitted
-            // For now, we just verify the command doesn't throw
-        } catch (error) {
-            // If Armada is not accessible, test should be skipped
-            console.log('Submit job test skipped - Armada may not be available:', error);
-            this.skip();
+            // Command execution should not throw - success expected
+            assert.ok(true, 'Submit job command executed successfully');
+        } catch (error: any) {
+            // Only skip if it's a configuration/connection error
+            if (error.message && (error.message.includes('not configured') || error.message.includes('connection'))) {
+                console.log('Submit job test skipped - Armada not accessible:', error.message);
+                this.skip();
+            } else {
+                // Real error - fail the test
+                throw error;
+            }
         } finally {
             await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         }
@@ -205,11 +216,15 @@ suite('Armada Extension Integration Tests', () => {
         
         try {
             await executeCommand('armada.refreshJobs');
-            // Command should execute without throwing
             assert.ok(true, 'Refresh jobs command executed');
-        } catch (error) {
-            // May fail if Armada is not configured/available
-            console.log('Refresh jobs test note:', error);
+        } catch (error: any) {
+            // Only skip for known configuration issues
+            if (error.message && error.message.includes('not configured')) {
+                console.log('Refresh jobs test skipped - not configured');
+                this.skip();
+            } else {
+                throw error;
+            }
         }
     });
     
@@ -218,11 +233,15 @@ suite('Armada Extension Integration Tests', () => {
         
         try {
             await executeCommand('armada.browseQueues');
-            // Command should execute without throwing
             assert.ok(true, 'Browse queues command executed');
-        } catch (error) {
-            // May fail if Armada is not configured/available
-            console.log('Browse queues test note:', error);
+        } catch (error: any) {
+            // Only skip for known configuration issues
+            if (error.message && error.message.includes('not configured')) {
+                console.log('Browse queues test skipped - not configured');
+                this.skip();
+            } else {
+                throw error;
+            }
         }
     });
 });
