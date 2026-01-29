@@ -16,8 +16,8 @@ This directory contains GitHub Actions workflows for automated CI/CD of the Arma
 - Runs ESLint for code quality
 - Compiles TypeScript
 - Runs tests
-- Packages the extension as `.vsix` file
-- Uploads VSIX as artifact for review
+- Packages the extension as `.vsix` file (Node.js 20.x only)
+- Uploads the `.vsix` as an artifact for review (Node.js 20.x only)
 
 ### 2. Release Please Workflow (`release-please.yml`)
 
@@ -48,7 +48,7 @@ chore: maintenance (no version bump)
 **Purpose**: Publishes the extension to Visual Studio Code Marketplace
 
 **Steps**:
-- Checks out code at the release tag
+- Checks out the repository source code
 - Installs dependencies
 - Runs linter and tests
 - Packages the extension

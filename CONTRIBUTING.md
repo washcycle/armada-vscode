@@ -142,7 +142,7 @@ All pull requests trigger the CI workflow which:
 - Runs ESLint
 - Compiles TypeScript
 - Runs tests
-- Packages the extension
+- Packages the extension (in the Node.js 20.x CI job only, due to vsce version requirements)
 
 Merging to `main` triggers the release-please workflow which creates release PRs with automated versioning.
 
