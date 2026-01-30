@@ -74,6 +74,17 @@ export interface QueueInfo {
     resourceLimits?: Record<string, string>;
 }
 
+export interface Queue {
+    name: string;
+    priority_factor: number;
+    user_owners?: string[];
+    group_owners?: string[];
+    resource_limits_by_priority_class_name?: Record<string, any>;
+    permissions?: any[];
+    cordoned?: boolean;
+    labels?: Record<string, string>;
+}
+
 /**
  * gRPC response types
  */
