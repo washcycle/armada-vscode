@@ -26,7 +26,7 @@ POSTGRES_VALUES_CI := $(MANIFEST_DIR)/postgres.values.ci.yaml
 
 up: kind-create helm-repos install-cert-manager install-armada-deps install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Stand up a kind cluster with Armada via Helm + Operator
 
-up-ci: kind-create helm-repos install-cert-manager install-prometheus-crds install-armada-deps-ci install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Minimal CI setup with reduced resources
+up-ci: kind-create helm-repos install-cert-manager install-armada-deps-ci install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Minimal CI setup with reduced resources
 
 down: delete-armada-crs delete-priority-class uninstall-armada-operator uninstall-armada-deps uninstall-cert-manager kind-delete ## Tear everything back down
 
@@ -89,10 +89,12 @@ install-pulsar:
 	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-pulsar-ci:
-	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
+	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/pulsar-standalone.yaml
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=180s -n $(DATA_NAMESPACE) deployment/pulsar
 
 uninstall-pulsar:
 	helm uninstall pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/pulsar-standalone.yaml --ignore-not-found
 
 install-redis:
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
