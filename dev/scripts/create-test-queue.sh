@@ -26,16 +26,34 @@ contexts:
 EOF
 fi
 
-# Create the queue
-armadactl create queue "${QUEUE_NAME}" \
-    --priority-factor 1.0 \
-    --owners anonymous
+# Create the queue with retry logic
+MAX_RETRIES=10
+RETRY_DELAY=5
+CREATED=false
 
-echo "✓ Test queue created successfully"
+for i in $(seq 1 $MAX_RETRIES); do
+    echo "Attempt $i/$MAX_RETRIES to create queue..."
+    if armadactl create queue "${QUEUE_NAME}" \
+        --priority-factor 1.0 \
+        --owners anonymous 2>&1; then
+        echo "✓ Test queue created successfully"
+        CREATED=true
+        break
+    else
+        if [ $i -eq $MAX_RETRIES ]; then
+            echo "✗ Failed to create queue after $MAX_RETRIES attempts"
+            exit 1
+        fi
+        echo "Connection failed, waiting ${RETRY_DELAY}s before retry..."
+        sleep $RETRY_DELAY
+    fi
+done
 
 # Verify queue was created
-if armadactl get queue "${QUEUE_NAME}" > /dev/null 2>&1; then
-    echo "✓ Queue verified"
-else
-    echo "⚠ Could not verify queue (this may be normal)"
+if [ "$CREATED" = true ]; then
+    if armadactl get queue "${QUEUE_NAME}" > /dev/null 2>&1; then
+        echo "✓ Queue verified"
+    else
+        echo "⚠ Could not verify queue (this may be normal)"
+    fi
 fi
