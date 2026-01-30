@@ -1,0 +1,105 @@
+fullnameOverride: "pulsar"
+
+volumes:
+  persistence: false
+
+affinity:
+  anti_affinity: false
+
+monitoring:
+  prometheus: false
+
+components:
+  zookeeper: true
+  bookkeeper: true
+  broker: true
+  proxy: true
+  autorecovery: false
+  functions: false
+  toolset: false  # Disabled for CI - not needed
+  pulsar_manager: false  # Disabled for CI - not needed
+
+zookeeper:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+bookkeeper:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "300m"
+  configData:
+    # Ultra-minimal memory use for bookkeeper in CI
+    dbStorage_writeCacheMaxSizeMb: "8"
+    dbStorage_readAheadCacheMaxSizeMb: "8"
+    dbStorage_rocksDB_writeBufferSizeMB: "2"
+    dbStorage_rocksDB_blockCacheSize: "2097152"
+    diskUsageThreshold: "0.999"
+    PULSAR_MEM: "-Xms128m -Xmx256m"
+    PULSAR_GC: "-XX:+UseG1GC"
+
+broker:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "300m"
+  configData:
+    autoSkipNonRecoverableData: "true"
+    managedLedgerDefaultEnsembleSize: "1"
+    managedLedgerDefaultWriteQuorum: "1"
+    managedLedgerDefaultAckQuorum: "1"
+    PULSAR_MEM: "-Xms128m -Xmx256m"
+    PULSAR_GC: "-XX:+UseG1GC"
+
+proxy:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Explicitly disable all monitoring components
+kube-prometheus-stack:
+  enabled: false
+
+victoria-metrics-k8s-stack:
+  enabled: false
+  victoria-metrics-operator:
+    enabled: false
+    crds:
+      plain: false
+  vmsingle:
+    enabled: false
+  vmagent:
+    enabled: false
+  vmalert:
+    enabled: false
+  alertmanager:
+    enabled: false
+  grafana:
+    enabled: false

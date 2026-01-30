@@ -8,7 +8,8 @@ import { ArmadaJobSpec, JobState } from '../types/armada';
 export async function submitJobCommand(
     client: ArmadaClient | undefined,
     configManager: ConfigManager,
-    jobTreeProvider: JobTreeProvider
+    jobTreeProvider: JobTreeProvider,
+    options?: { skipConfirmation?: boolean }
 ): Promise<void> {
     // Check if client is initialized
     if (!client) {
@@ -58,16 +59,18 @@ export async function submitJobCommand(
             return;
         }
 
-        // Confirm submission
+        // Confirm submission (unless skipConfirmation is set)
         const jobCount = jobSpec.jobs.length;
-        const confirmation = await vscode.window.showInformationMessage(
-            `Submit ${jobCount} job${jobCount > 1 ? 's' : ''} to queue "${jobSpec.queue}"?`,
-            'Submit',
-            'Cancel'
-        );
+        if (!options?.skipConfirmation) {
+            const confirmation = await vscode.window.showInformationMessage(
+                `Submit ${jobCount} job${jobCount > 1 ? 's' : ''} to queue "${jobSpec.queue}"?`,
+                'Submit',
+                'Cancel'
+            );
 
-        if (confirmation !== 'Submit') {
-            return;
+            if (confirmation !== 'Submit') {
+                return;
+            }
         }
 
         // Show progress

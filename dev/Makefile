@@ -1,4 +1,4 @@
-.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces
+.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces create-test-queue
 
 KIND_CLUSTER_NAME ?= armada
 KIND_CONTEXT := kind-$(KIND_CLUSTER_NAME)
@@ -19,7 +19,14 @@ PULSAR_VALUES := $(MANIFEST_DIR)/pulsar.values.yaml
 REDIS_VALUES := $(MANIFEST_DIR)/redis.values.yaml
 POSTGRES_VALUES := $(MANIFEST_DIR)/postgres.values.yaml
 
+# CI-specific minimal values for faster startup
+PULSAR_VALUES_CI := $(MANIFEST_DIR)/pulsar.values.ci.yaml
+REDIS_VALUES_CI := $(MANIFEST_DIR)/redis.values.ci.yaml
+POSTGRES_VALUES_CI := $(MANIFEST_DIR)/postgres.values.ci.yaml
+
 up: kind-create helm-repos install-cert-manager install-armada-deps install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Stand up a kind cluster with Armada via Helm + Operator
+
+up-ci: kind-create helm-repos install-cert-manager install-prometheus-crds install-armada-deps-ci install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Minimal CI setup with reduced resources
 
 down: delete-armada-crs delete-priority-class uninstall-armada-operator uninstall-armada-deps uninstall-cert-manager kind-delete ## Tear everything back down
 
@@ -59,6 +66,10 @@ install-cert-manager: ## Install cert-manager into the kind cluster
 	kubectl --context $(KIND_CONTEXT) apply -f $(CERT_MANAGER_MANIFEST)
 	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=300s -n $(CERT_MANAGER_NAMESPACE) deploy/cert-manager deploy/cert-manager-cainjector deploy/cert-manager-webhook || true
 
+install-prometheus-crds: ## Install Prometheus Operator CRDs (needed for PodMonitor resources)
+	kubectl --context $(KIND_CONTEXT) apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.70.0/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml || true
+	kubectl --context $(KIND_CONTEXT) apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.70.0/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml || true
+
 uninstall-cert-manager: ## Remove cert-manager resources
 	kubectl --context $(KIND_CONTEXT) delete -f $(CERT_MANAGER_MANIFEST) --ignore-not-found
 
@@ -70,10 +81,15 @@ ensure-namespaces: ## Ensure the shared namespaces exist
 
 install-armada-deps: ensure-namespaces install-pulsar install-redis install-postgres ## Install all external dependencies via Helm
 
+install-armada-deps-ci: ensure-namespaces install-pulsar-ci install-redis-ci install-postgres-ci ## Install minimal CI dependencies
+
 uninstall-armada-deps: uninstall-postgres uninstall-redis uninstall-pulsar ## Remove external dependencies
 
 install-pulsar:
 	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES) --wait --timeout $(HELM_TIMEOUT)
+
+install-pulsar-ci:
+	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
 
 uninstall-pulsar:
 	helm uninstall pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
@@ -81,14 +97,24 @@ uninstall-pulsar:
 install-redis:
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
+install-redis-ci:
+	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/redis-simple.yaml
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=60s -n $(DATA_NAMESPACE) deployment/redis
+
 uninstall-redis:
 	helm uninstall redis -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/redis-simple.yaml --ignore-not-found
 
 install-postgres:
 	helm upgrade --install postgres bitnami/postgresql -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(POSTGRES_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
+install-postgres-ci:
+	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/postgres-simple.yaml
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=120s -n $(DATA_NAMESPACE) deployment/postgres
+
 uninstall-postgres:
 	helm uninstall postgres -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/postgres-simple.yaml --ignore-not-found
 
 install-armada-operator: ## Install the released Armada Operator chart
 	helm upgrade --install armada-operator gresearch/armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace --wait --timeout $(HELM_TIMEOUT)
@@ -110,3 +136,7 @@ apply-armada-crs: ## Apply the Armada CRs that stand up the demo install
 
 delete-armada-crs: ## Delete the demo Armada CRs
 	kubectl --context $(KIND_CONTEXT) delete -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR) --ignore-not-found
+
+create-test-queue: ## Create a test queue for integration testing
+	@echo "Creating test queue..."
+	@bash scripts/create-test-queue.sh

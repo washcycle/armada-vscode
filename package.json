@@ -256,8 +256,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && npm run copy-proto",
+    "compile": "tsc -p ./ && npm run copy-proto && npm run copy-test-fixtures",
     "copy-proto": "mkdir -p out/proto && cp -r src/proto/* out/proto/",
+    "copy-test-fixtures": "mkdir -p out/test/fixtures && if [ -d src/test/fixtures ]; then cp src/test/fixtures/* out/test/fixtures/; fi",
     "download-protos": "bash scripts/download-protos.sh",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
@@ -268,11 +269,13 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/js-yaml": "^4.0.9",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^20.10.0",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
     "@vscode/test-electron": "^2.4.1",
+    "mocha": "^10.3.0",
     "eslint": "^9.39.2",
     "glob": "^13.0.0",
     "typescript": "^5.7.2"
