@@ -98,7 +98,7 @@ install-redis:
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-redis-ci:
-	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
+	helm upgrade --install redis bitnami/redis -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f operator/quickstart/redis-simple.values.ci.yaml --wait --timeout $(HELM_TIMEOUT)
 
 uninstall-redis:
 	helm uninstall redis -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
