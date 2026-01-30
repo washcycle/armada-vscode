@@ -13,7 +13,7 @@ permissions:
 jobs:
   integration-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -36,41 +36,81 @@ jobs:
       - name: Setup Docker
         uses: docker/setup-buildx-action@v3
 
+      - name: Cache CLI tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/bin/kubectl
+            /usr/local/bin/kind
+            /usr/local/bin/armadactl
+          key: cli-tools-${{ runner.os }}-kubectl-latest-kind-0.20.0-armadactl-0.20.28
+          restore-keys: |
+            cli-tools-${{ runner.os }}-
+
       - name: Install kubectl
         run: |
-          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          chmod +x kubectl
-          sudo mv kubectl /usr/local/bin/
+          if [ ! -f /usr/local/bin/kubectl ]; then
+            curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            sudo mv kubectl /usr/local/bin/
+          fi
           kubectl version --client
 
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
-          version: "latest"
+          version: "v3.14.0"
 
       - name: Install kind
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
-          chmod +x ./kind
-          sudo mv ./kind /usr/local/bin/kind
+          if [ ! -f /usr/local/bin/kind ]; then
+            curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+            chmod +x ./kind
+            sudo mv ./kind /usr/local/bin/kind
+          fi
           kind version
+
+      - name: Cache Helm charts
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/helm
+          key: helm-charts-${{ hashFiles('dev/operator/quickstart/pulsar.values.yaml', 'dev/operator/quickstart/redis.values.yaml', 'dev/operator/quickstart/postgres.values.yaml') }}
+          restore-keys: |
+            helm-charts-
+
+      - name: Cache kind images
+        uses: actions/cache@v4
+        with:
+          path: /tmp/kind-image-cache
+          key: kind-images-${{ runner.os }}-v2
+          restore-keys: |
+            kind-images-${{ runner.os }}-
+
+      - name: Pre-pull common images (background)
+        run: |
+          # Pre-pull common images in parallel to speed up setup
+          docker pull bitnami/postgresql:16 &
+          docker pull apache/pulsar:3.0.0 &
+          docker pull redis:7-alpine &
+          wait
+        continue-on-error: true
 
       - name: Setup Armada with kind
         working-directory: dev
         run: |
-          echo "Setting up Armada cluster..."
-          make up
-        timeout-minutes: 30
+          echo "Setting up minimal Armada cluster for CI..."
+          make up-ci
+        timeout-minutes: 20
 
       - name: Wait for Armada to be ready
         run: |
           echo "Waiting for Armada components to be ready..."
-          kubectl --context kind-armada wait --for=condition=Available --timeout=300s -n armada-system deployment/armada-operator-controller-manager || true
-          kubectl --context kind-armada wait --for=condition=Ready --timeout=300s -n armada pods -l app.kubernetes.io/name=armada-server || true
+          kubectl --context kind-armada wait --for=condition=Available --timeout=180s -n armada-system deployment/armada-operator-controller-manager || true
+          kubectl --context kind-armada wait --for=condition=Ready --timeout=180s -n armada pods -l app.kubernetes.io/name=armada-server || true
           echo "Checking final status..."
           kubectl --context kind-armada get pods -n armada-system
           kubectl --context kind-armada get pods -n armada || true
-        timeout-minutes: 10
+        timeout-minutes: 5
 
       - name: Verify Armada is running
         run: |
@@ -82,12 +122,14 @@ jobs:
 
       - name: Install armadactl
         run: |
-          echo "Installing armadactl from GitHub releases..."
-          ARMADACTL_VERSION="0.20.28"
-          curl -L "https://github.com/armadaproject/armada/releases/download/v${ARMADACTL_VERSION}/armadactl_${ARMADACTL_VERSION}_linux_amd64.tar.gz" -o armadactl.tar.gz
-          tar -xzf armadactl.tar.gz
-          chmod +x armadactl
-          sudo mv armadactl /usr/local/bin/
+          if [ ! -f /usr/local/bin/armadactl ]; then
+            echo "Installing armadactl from GitHub releases..."
+            ARMADACTL_VERSION="0.20.28"
+            curl -L "https://github.com/armadaproject/armada/releases/download/v${ARMADACTL_VERSION}/armadactl_${ARMADACTL_VERSION}_linux_amd64.tar.gz" -o armadactl.tar.gz
+            tar -xzf armadactl.tar.gz
+            chmod +x armadactl
+            sudo mv armadactl /usr/local/bin/
+          fi
           armadactl version
 
       - name: Setup armadactl config test configuration

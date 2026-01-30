@@ -1,0 +1,20 @@
+fullnameOverride: "postgres"
+
+auth:
+  postgresPassword: "psw"
+  database: "armada"
+  username: "armada"
+  password: "armada"
+
+primary:
+  initdb:
+    scripts:
+      init-databases.sql: |
+        CREATE DATABASE scheduler;
+        CREATE DATABASE lookout;
+
+  resourcesPreset: "nano"
+
+  persistence:
+    enabled: false  # Disabled for CI - faster startup, no data needed long-term
+    size: 1Gi

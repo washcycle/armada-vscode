@@ -1,0 +1,71 @@
+fullnameOverride: "pulsar"
+
+volumes:
+  persistence: false
+
+affinity:
+  anti_affinity: false
+
+monitoring:
+  prometheus: false
+
+components:
+  zookeeper: true
+  bookkeeper: true
+  broker: true
+  proxy: true
+  autorecovery: false
+  functions: false
+  toolset: false  # Disabled for CI - not needed
+  pulsar_manager: false  # Disabled for CI - not needed
+
+zookeeper:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+
+bookkeeper:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+  configData:
+    # minimal memory use for bookkeeper
+    dbStorage_writeCacheMaxSizeMb: "16"
+    dbStorage_readAheadCacheMaxSizeMb: "16"
+    dbStorage_rocksDB_writeBufferSizeMB: "4"
+    dbStorage_rocksDB_blockCacheSize: "4194304"
+    diskUsageThreshold: "0.999"
+
+broker:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+  configData:
+    autoSkipNonRecoverableData: "true"
+    managedLedgerDefaultEnsembleSize: "1"
+    managedLedgerDefaultWriteQuorum: "1"
+    managedLedgerDefaultAckQuorum: "1"
+
+proxy:
+  replicaCount: 1
+  podMonitor:
+    enabled: false
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+
+victoria-metrics-k8s-stack:
+  enabled: false

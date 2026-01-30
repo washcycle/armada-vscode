@@ -19,7 +19,14 @@ PULSAR_VALUES := $(MANIFEST_DIR)/pulsar.values.yaml
 REDIS_VALUES := $(MANIFEST_DIR)/redis.values.yaml
 POSTGRES_VALUES := $(MANIFEST_DIR)/postgres.values.yaml
 
+# CI-specific minimal values for faster startup
+PULSAR_VALUES_CI := $(MANIFEST_DIR)/pulsar.values.ci.yaml
+REDIS_VALUES_CI := $(MANIFEST_DIR)/redis.values.ci.yaml
+POSTGRES_VALUES_CI := $(MANIFEST_DIR)/postgres.values.ci.yaml
+
 up: kind-create helm-repos install-cert-manager install-armada-deps install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Stand up a kind cluster with Armada via Helm + Operator
+
+up-ci: kind-create helm-repos install-cert-manager install-armada-deps-ci install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Minimal CI setup with reduced resources
 
 down: delete-armada-crs delete-priority-class uninstall-armada-operator uninstall-armada-deps uninstall-cert-manager kind-delete ## Tear everything back down
 
@@ -70,10 +77,15 @@ ensure-namespaces: ## Ensure the shared namespaces exist
 
 install-armada-deps: ensure-namespaces install-pulsar install-redis install-postgres ## Install all external dependencies via Helm
 
+install-armada-deps-ci: ensure-namespaces install-pulsar-ci install-redis-ci install-postgres-ci ## Install minimal CI dependencies
+
 uninstall-armada-deps: uninstall-postgres uninstall-redis uninstall-pulsar ## Remove external dependencies
 
 install-pulsar:
 	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES) --wait --timeout $(HELM_TIMEOUT)
+
+install-pulsar-ci:
+	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
 
 uninstall-pulsar:
 	helm uninstall pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
@@ -81,11 +93,17 @@ uninstall-pulsar:
 install-redis:
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
+install-redis-ci:
+	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
+
 uninstall-redis:
 	helm uninstall redis -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
 
 install-postgres:
 	helm upgrade --install postgres bitnami/postgresql -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(POSTGRES_VALUES) --wait --timeout $(HELM_TIMEOUT)
+
+install-postgres-ci:
+	helm upgrade --install postgres bitnami/postgresql -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(POSTGRES_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
 
 uninstall-postgres:
 	helm uninstall postgres -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true

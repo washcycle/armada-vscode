@@ -1,0 +1,16 @@
+fullnameOverride: "redis"
+replicas: 1  # Reduced from 2 for CI
+hardAntiAffinity: false
+master:
+  extraFlags:
+    - --min-replicas-to-write 0
+redis:
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+haproxy:
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
