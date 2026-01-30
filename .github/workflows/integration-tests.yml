@@ -83,8 +83,9 @@ jobs:
       - name: Install armadactl
         run: |
           echo "Installing armadactl from GitHub releases..."
-          ARMADACTL_VERSION="v0.17.0"
-          curl -L "https://github.com/armadaproject/armada/releases/download/${ARMADACTL_VERSION}/armadactl-${ARMADACTL_VERSION}-linux-amd64" -o armadactl
+          ARMADACTL_VERSION="0.20.28"
+          curl -L "https://github.com/armadaproject/armada/releases/download/v${ARMADACTL_VERSION}/armadactl_${ARMADACTL_VERSION}_linux_amd64.tar.gz" -o armadactl.tar.gz
+          tar -xzf armadactl.tar.gz
           chmod +x armadactl
           sudo mv armadactl /usr/local/bin/
           armadactl version
