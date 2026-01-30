@@ -2,9 +2,9 @@ name: Integration Tests
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +14,7 @@ jobs:
   integration-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -22,8 +22,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
@@ -46,7 +46,7 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@v4
         with:
-          version: 'latest'
+          version: "latest"
 
       - name: Install kind
         run: |
@@ -90,13 +90,7 @@ jobs:
           sudo mv armadactl /usr/local/bin/
           armadactl version
 
-      - name: Create test queue
-        working-directory: dev
-        run: |
-          echo "Creating test queue for integration tests..."
-          bash scripts/create-test-queue.sh
-
-      - name: Setup test configuration
+      - name: Setup armadactl config test configuration
         run: |
           mkdir -p $HOME/.config
           cat > $HOME/.armadactl.yaml <<EOF
@@ -108,6 +102,12 @@ jobs:
           EOF
           cat $HOME/.armadactl.yaml
 
+      - name: Create test queue
+        working-directory: dev
+        run: |
+          echo "Creating test queue for integration tests..."
+          bash scripts/create-test-queue.sh
+
       - name: Compile TypeScript
         run: npm run compile
 
@@ -116,7 +116,7 @@ jobs:
           echo "Running integration tests..."
           xvfb-run -a npm test
         env:
-          DISPLAY: ':99.0'
+          DISPLAY: ":99.0"
 
       - name: Collect logs on failure
         if: failure()
