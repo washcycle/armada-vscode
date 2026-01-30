@@ -26,7 +26,7 @@ POSTGRES_VALUES_CI := $(MANIFEST_DIR)/postgres.values.ci.yaml
 
 up: kind-create helm-repos install-cert-manager install-armada-deps install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Stand up a kind cluster with Armada via Helm + Operator
 
-up-ci: kind-create helm-repos install-cert-manager install-armada-deps-ci install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Minimal CI setup with reduced resources
+up-ci: kind-create helm-repos install-cert-manager install-prometheus-crds install-armada-deps-ci install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Minimal CI setup with reduced resources
 
 down: delete-armada-crs delete-priority-class uninstall-armada-operator uninstall-armada-deps uninstall-cert-manager kind-delete ## Tear everything back down
 
@@ -65,6 +65,10 @@ helm-repos: ## Add/update Helm repos required for the demo stack
 install-cert-manager: ## Install cert-manager into the kind cluster
 	kubectl --context $(KIND_CONTEXT) apply -f $(CERT_MANAGER_MANIFEST)
 	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=300s -n $(CERT_MANAGER_NAMESPACE) deploy/cert-manager deploy/cert-manager-cainjector deploy/cert-manager-webhook || true
+
+install-prometheus-crds: ## Install Prometheus Operator CRDs (needed for PodMonitor resources)
+	kubectl --context $(KIND_CONTEXT) apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.70.0/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml || true
+	kubectl --context $(KIND_CONTEXT) apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.70.0/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml || true
 
 uninstall-cert-manager: ## Remove cert-manager resources
 	kubectl --context $(KIND_CONTEXT) delete -f $(CERT_MANAGER_MANIFEST) --ignore-not-found

@@ -67,5 +67,23 @@ proxy:
       memory: "256Mi"
       cpu: "100m"
 
+# Explicitly disable all monitoring components
+kube-prometheus-stack:
+  enabled: false
+
 victoria-metrics-k8s-stack:
   enabled: false
+  victoria-metrics-operator:
+    enabled: false
+    crds:
+      plain: false
+  vmsingle:
+    enabled: false
+  vmagent:
+    enabled: false
+  vmalert:
+    enabled: false
+  alertmanager:
+    enabled: false
+  grafana:
+    enabled: false
