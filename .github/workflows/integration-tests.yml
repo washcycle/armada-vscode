@@ -96,7 +96,7 @@ jobs:
           cat > $HOME/.armadactl.yaml <<EOF
           currentContext: test
           contexts:
-            - name: test
+            test:
               armadaUrl: localhost:30002
               execTimeout: 2m
           EOF

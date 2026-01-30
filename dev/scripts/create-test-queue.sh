@@ -20,7 +20,7 @@ if [ ! -f ~/.armadactl.yaml ]; then
     cat > ~/.armadactl.yaml <<EOF
 currentContext: test
 contexts:
-  - name: test
+  test:
     armadaUrl: ${ARMADA_URL}
     execTimeout: 2m
 EOF
