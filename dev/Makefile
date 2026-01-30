@@ -98,19 +98,23 @@ install-redis:
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-redis-ci:
-	helm upgrade --install redis bitnami/redis -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f operator/quickstart/redis-simple.values.ci.yaml --wait --timeout $(HELM_TIMEOUT)
+	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/redis-simple.yaml
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=60s -n $(DATA_NAMESPACE) deployment/redis
 
 uninstall-redis:
 	helm uninstall redis -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/redis-simple.yaml --ignore-not-found
 
 install-postgres:
 	helm upgrade --install postgres bitnami/postgresql -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(POSTGRES_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-postgres-ci:
-	helm upgrade --install postgres bitnami/postgresql -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(POSTGRES_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
+	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/postgres-simple.yaml
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=120s -n $(DATA_NAMESPACE) deployment/postgres
 
 uninstall-postgres:
 	helm uninstall postgres -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/postgres-simple.yaml --ignore-not-found
 
 install-armada-operator: ## Install the released Armada Operator chart
 	helm upgrade --install armada-operator gresearch/armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace --wait --timeout $(HELM_TIMEOUT)
