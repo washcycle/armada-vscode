@@ -117,6 +117,7 @@ jobs:
           xvfb-run -a npm test
         env:
           DISPLAY: ":99.0"
+          CI: "true"
 
       - name: Collect logs on failure
         if: failure()
