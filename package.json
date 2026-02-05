@@ -268,7 +268,7 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^20.10.0",
+    "@types/node": "^25.2.0",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
     "@typescript-eslint/parser": "^8.18.1",
