@@ -104,12 +104,35 @@ jobs:
 
       - name: Wait for Armada to be ready
         run: |
+          set -euo pipefail
           echo "Waiting for Armada components to be ready..."
-          kubectl --context kind-armada wait --for=condition=Available --timeout=180s -n armada-system deployment/armada-operator-controller-manager || true
-          kubectl --context kind-armada wait --for=condition=Ready --timeout=180s -n armada pods -l app.kubernetes.io/name=armada-server || true
+
+          kubectl --context kind-armada wait --for=condition=Available --timeout=300s -n armada-system deployment/armada-operator-controller-manager
+          kubectl --context kind-armada wait --for=condition=Available --timeout=300s -n data deployment/pulsar deployment/redis deployment/postgres
+
+          echo "Waiting for Armada namespace pods to appear..."
+          for i in $(seq 1 120); do
+            ARMADA_POD_COUNT=$(kubectl --context kind-armada get pods -n armada --no-headers 2>/dev/null | wc -l | tr -d ' ')
+            if [ "$ARMADA_POD_COUNT" -gt 0 ]; then
+              break
+            fi
+            sleep 5
+          done
+
+          ARMADA_POD_COUNT=$(kubectl --context kind-armada get pods -n armada --no-headers 2>/dev/null | wc -l | tr -d ' ')
+          if [ "$ARMADA_POD_COUNT" -eq 0 ]; then
+            echo "Timed out waiting for Armada pods in namespace armada"
+            kubectl --context kind-armada get pods -n armada-system || true
+            kubectl --context kind-armada get pods -n armada || true
+            kubectl --context kind-armada get events -n armada --sort-by=.metadata.creationTimestamp | tail -n 50 || true
+            exit 1
+          fi
+
+          kubectl --context kind-armada wait --for=condition=Ready --timeout=300s -n armada pod --all
           echo "Checking final status..."
           kubectl --context kind-armada get pods -n armada-system
-          kubectl --context kind-armada get pods -n armada || true
+          kubectl --context kind-armada get pods -n data
+          kubectl --context kind-armada get pods -n armada
         timeout-minutes: 5
 
       - name: Verify Armada is running

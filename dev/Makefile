@@ -81,7 +81,12 @@ ensure-namespaces: ## Ensure the shared namespaces exist
 
 install-armada-deps: ensure-namespaces install-pulsar install-redis install-postgres ## Install all external dependencies via Helm
 
-install-armada-deps-ci: ensure-namespaces install-pulsar-ci install-redis-ci install-postgres-ci ## Install minimal CI dependencies
+install-armada-deps-ci: ensure-namespaces ## Install minimal CI dependencies
+	@set -e; \
+		$(MAKE) install-pulsar-ci & \
+		$(MAKE) install-redis-ci & \
+		$(MAKE) install-postgres-ci & \
+		wait
 
 uninstall-armada-deps: uninstall-postgres uninstall-redis uninstall-pulsar ## Remove external dependencies
 
