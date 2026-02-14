@@ -1,0 +1,71 @@
+# Changelog
+
+## [0.2.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.1.1...armada-vscode-v0.2.0) (2026-02-14)
+
+
+### Features
+
+* add ability to create a queue ([934a508](https://github.com/washcycle/armada-vscode/commit/934a508f7e7728b3caf25d567eff89449d5ca73a))
+* add CI-specific configurations and caching for faster integration test setup ([68417ed](https://github.com/washcycle/armada-vscode/commit/68417ed210d7e32ddd0e4b9af5479252e288991e))
+* add GitHub Actions for CI/CD and automated marketplace publishing ([ecce3b7](https://github.com/washcycle/armada-vscode/commit/ecce3b70e52982f0db50a9705dd73d45291556f5))
+* add metadata and icon for the Armada VSCode extension ([688db8c](https://github.com/washcycle/armada-vscode/commit/688db8c4b96588ffd097b157e863569c2ee41cb5))
+* add PostgreSQL configuration with init script and service ([162bca3](https://github.com/washcycle/armada-vscode/commit/162bca3a62e4795316df0f49b036291c456bffc4))
+* add skipConfirmation option to submitJob command for testing ([00bccd7](https://github.com/washcycle/armada-vscode/commit/00bccd799f9b720fc2716e4944e912ca8863e959))
+* add test queue creation for integration tests ([0159b45](https://github.com/washcycle/armada-vscode/commit/0159b4537f1ba235da3bc54171683168b6cbde1c))
+* added initial capabilities ([b87eab7](https://github.com/washcycle/armada-vscode/commit/b87eab7017deecf582333e062e282c0635e8d6d7))
+* install armadactl v0.17.0 from GitHub releases in CI ([4d70a5f](https://github.com/washcycle/armada-vscode/commit/4d70a5fb4302a960eeaa8f2ec55ce48b2d6fbbe3))
+* integration tests with Armada instance in GitHub Actions ([079144e](https://github.com/washcycle/armada-vscode/commit/079144e067e504102474b7797d667717d68dffe3))
+* Setup npm as the package ecosystem for Dependabot ([52d76b2](https://github.com/washcycle/armada-vscode/commit/52d76b2d0f294b0b849b2db74b2100b33858a964))
+* update CI configuration to use lightweight Alpine image for PostgreSQL ([fb94363](https://github.com/washcycle/armada-vscode/commit/fb943632bd9fd5cce78ff257a2e513812e9a6fe6))
+
+
+### Bug Fixes
+
+* add explicit permissions to workflow jobs ([1f17ee5](https://github.com/washcycle/armada-vscode/commit/1f17ee59b7619ccbaaea3a58989a010a9346384a))
+* add Prometheus CRDs for Pulsar PodMonitor resources ([205da01](https://github.com/washcycle/armada-vscode/commit/205da01d39598cb6365d8655fa6ab8901f759a80))
+* add retry logic to queue creation for CI timing issues ([5b7b9a1](https://github.com/washcycle/armada-vscode/commit/5b7b9a120d068c0a458a02353731e7531d1585c9))
+* add timeout and better error handling to submit job integration test ([b9a0df3](https://github.com/washcycle/armada-vscode/commit/b9a0df3f1f9db1a3b06bedf9a20ce36e73ea34f6))
+* clean reinstall of dependencies for package-lock.json ([1e3bb50](https://github.com/washcycle/armada-vscode/commit/1e3bb5029213d3cb7a22c7224de8ec783374a6e8))
+* clean up formatting in publish workflow ([4c27587](https://github.com/washcycle/armada-vscode/commit/4c2758786737fb5180de6df45a51f248beb701f2))
+* clean up redundant code in publish.yml workflow ([e81e383](https://github.com/washcycle/armada-vscode/commit/e81e3838a64c1ce5214736698919e24c5260a114))
+* correct Redis service name for Armada compatibility ([dc0bf51](https://github.com/washcycle/armada-vscode/commit/dc0bf515a1f1fb624f48e85ad2cc80860d4cfca3))
+* handle dialog timeout in Submit Job integration test ([70668ba](https://github.com/washcycle/armada-vscode/commit/70668bab32f232e5a5f6a80efaed7503a8ed68d7))
+* improve publish workflow with release tag checkout and environment protection ([88c43b7](https://github.com/washcycle/armada-vscode/commit/88c43b7e3c6f87775945565dc577927e07bd00ac))
+* only package extension on Node 20.x due to vsce requirements ([ce3d339](https://github.com/washcycle/armada-vscode/commit/ce3d339befe931d67394684152d1623e6212a7f4))
+* regenerate package-lock.json for Node 20 compatibility ([12133c2](https://github.com/washcycle/armada-vscode/commit/12133c2b54033b1fcc29baad78f449d6d754264e))
+* remove Node 18.x from CI matrix, use only 20.x ([60cec94](https://github.com/washcycle/armada-vscode/commit/60cec94fd7721f2fa3f129412e881a45e46681af))
+* revert to Pulsar Helm chart - standalone incompatible ([b434869](https://github.com/washcycle/armada-vscode/commit/b4348690ffbd4fc5c1f38863611578e9a4f1bc25))
+* skip interactive command tests in CI environment ([e830b9c](https://github.com/washcycle/armada-vscode/commit/e830b9c8e29d9aaec8f7e4425dd3eb69b81eeb42))
+* standardize formatting and reorder steps in integration tests workflow ([2eb24e6](https://github.com/washcycle/armada-vscode/commit/2eb24e6ff45676a677b0f80d7c2989bf14ac6ef9))
+* update armadactl installation to use correct tar.gz format and v0.20.28 ([4c96c59](https://github.com/washcycle/armada-vscode/commit/4c96c59e8bb078a28eabe7c34f19660c39fdeed2))
+* update glob package to version 11.1.0 and adjust dependencies ([af61281](https://github.com/washcycle/armada-vscode/commit/af612812322b4c218729814f26a36f4c5a5c93e6))
+* update integration test runner to use ubuntu-latest ([6abd05b](https://github.com/washcycle/armada-vscode/commit/6abd05b9331f6fbee79f1ed1c5ab2c0f136719b8))
+* update integration test runner to use ubuntu-latest-4-cores ([abb2993](https://github.com/washcycle/armada-vscode/commit/abb2993716940e697c053f095f03bb272416ebcb))
+* update version number to 0.1.1 in package.json ([bda1d9a](https://github.com/washcycle/armada-vscode/commit/bda1d9a82459a3110b870f7ef941cdda8f520d4e))
+* use armadactl instead of kubectl for queue creation ([2b48020](https://github.com/washcycle/armada-vscode/commit/2b48020298b397b49af115e085cfefd6530f3476))
+* use correct armadactl config format (map instead of list) ([4ebb56c](https://github.com/washcycle/armada-vscode/commit/4ebb56c40430243392738c417bb75e9c100481ec))
+
+
+### Miscellaneous
+
+* add release-please configuration files ([690d466](https://github.com/washcycle/armada-vscode/commit/690d4662d9676f3b1ff776868762624431516152))
+* **deps-dev:** bump eslint from 9.39.1 to 9.39.2 ([fb6ccd0](https://github.com/washcycle/armada-vscode/commit/fb6ccd08316875a33f833fd75cd157888967f9e8))
+* **deps-dev:** bump eslint from 9.39.1 to 9.39.2 ([b0891be](https://github.com/washcycle/armada-vscode/commit/b0891be4b6df4f89494a58fe6a92aa47cf98bb20))
+* **deps-dev:** bump glob from 11.0.3 to 11.1.0 in the npm_and_yarn group across 1 directory ([30f7bfe](https://github.com/washcycle/armada-vscode/commit/30f7bfe185db1cee3cf9b05d08c333037ed17a4e))
+* **deps-dev:** bump glob from 11.0.3 to 13.0.0 ([ddc50b8](https://github.com/washcycle/armada-vscode/commit/ddc50b83a1fb868da824cc751a7e5bf39d3bc3e8))
+* **deps-dev:** bump glob from 11.0.3 to 13.0.0 ([8354c2d](https://github.com/washcycle/armada-vscode/commit/8354c2df023d17ec3c4039a533f35d998bc3a0d4))
+* **deps-dev:** bump glob in the npm_and_yarn group across 1 directory ([be070da](https://github.com/washcycle/armada-vscode/commit/be070dacbe89bf0e5429e2f10f0d5e7f55dc9f4f))
+* **deps:** bump @grpc/grpc-js from 1.14.1 to 1.14.3 ([15421e7](https://github.com/washcycle/armada-vscode/commit/15421e769ce2d146b6d438a222b627fe9478095e))
+* **deps:** bump @grpc/grpc-js from 1.14.1 to 1.14.3 ([bda0a6e](https://github.com/washcycle/armada-vscode/commit/bda0a6ef2594920a50a46de752a79e3c8aa00e7e))
+* **deps:** bump @grpc/proto-loader from 0.7.15 to 0.8.0 ([9bfd674](https://github.com/washcycle/armada-vscode/commit/9bfd6748e97a50634cd2947471af8ef89b31f4fc))
+* **deps:** bump @grpc/proto-loader from 0.7.15 to 0.8.0 ([473072b](https://github.com/washcycle/armada-vscode/commit/473072b14dd9e5c88e58666a54c439104c494757))
+* **deps:** bump protobufjs from 7.5.4 to 8.0.0 ([e753f2e](https://github.com/washcycle/armada-vscode/commit/e753f2e049ad3456610e9e0698c215adbf1808cf))
+* **deps:** bump protobufjs from 7.5.4 to 8.0.0 ([dad94a7](https://github.com/washcycle/armada-vscode/commit/dad94a7016849dd9f7a966bfd8b305ad58d2a2ca))
+* remove placeholder for Marketplace installation in README ([82a6a07](https://github.com/washcycle/armada-vscode/commit/82a6a07e8b64dcf1a74334db3e486943257316ec))
+* update README and configuration files for clarity and consistency ([6964241](https://github.com/washcycle/armada-vscode/commit/6964241b382840d09dc29f2af3749e611bac9c58))
+
+
+### Documentation
+
+* add TODO comments for test step in workflows ([fa67cd0](https://github.com/washcycle/armada-vscode/commit/fa67cd0db286d52a08a52066e6fc3ce9990dbe23))
+* update README and CONTRIBUTING with CI/CD info ([46b061c](https://github.com/washcycle/armada-vscode/commit/46b061c74ae698bbe3c37655292d131604b16ae7))
