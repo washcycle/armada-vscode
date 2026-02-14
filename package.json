@@ -277,7 +277,7 @@
     "@vscode/test-electron": "^2.4.1",
     "mocha": "^10.3.0",
     "eslint": "^9.39.2",
-    "glob": "^13.0.0",
+    "glob": "^13.0.3",
     "typescript": "^5.7.2"
   },
   "dependencies": {
