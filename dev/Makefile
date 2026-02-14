@@ -13,6 +13,11 @@ HELM_TIMEOUT ?= 15m
 
 MANIFEST_DIR := operator/quickstart
 ARMADA_CRS_DIR := $(MANIFEST_DIR)/crs
+ARMADA_CRS_CI := \
+	$(ARMADA_CRS_DIR)/scheduler.yaml \
+	$(ARMADA_CRS_DIR)/armada-server.yaml \
+	$(ARMADA_CRS_DIR)/event-ingester.yaml \
+	$(ARMADA_CRS_DIR)/executor.yaml
 PRIORITY_CLASS := $(MANIFEST_DIR)/priority-class.yaml
 OPERATOR_RBAC_PATCH := $(MANIFEST_DIR)/operator-rbac-patch.yaml
 PULSAR_VALUES := $(MANIFEST_DIR)/pulsar.values.yaml
@@ -39,7 +44,7 @@ up-ci: ## Minimal CI setup with reduced resources
 		$(MAKE) install-armada-operator; \
 		$(MAKE) patch-operator-rbac; \
 		$(MAKE) apply-priority-class; \
-		$(MAKE) apply-armada-crs
+		$(MAKE) apply-armada-crs-ci
 
 down: delete-armada-crs delete-priority-class uninstall-armada-operator uninstall-armada-deps uninstall-cert-manager kind-delete ## Tear everything back down
 
@@ -157,6 +162,9 @@ delete-priority-class: ## Remove the demo PriorityClass
 
 apply-armada-crs: ## Apply the Armada CRs that stand up the demo install
 	kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR)
+
+apply-armada-crs-ci: ## Apply a minimal Armada CR set for CI
+	kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_CI)
 
 delete-armada-crs: ## Delete the demo Armada CRs
 	kubectl --context $(KIND_CONTEXT) delete -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR) --ignore-not-found

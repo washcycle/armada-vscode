@@ -100,7 +100,7 @@ jobs:
         run: |
           echo "Setting up minimal Armada cluster for CI..."
           make up-ci
-        timeout-minutes: 20
+        timeout-minutes: 30
 
       - name: Wait for Armada to be ready
         run: |
@@ -110,32 +110,11 @@ jobs:
           kubectl --context kind-armada wait --for=condition=Available --timeout=330s -n armada-system deployment/armada-operator-controller-manager
           kubectl --context kind-armada wait --for=condition=Available --timeout=330s -n data deployment/pulsar deployment/redis deployment/postgres
 
-          echo "Waiting for Armada namespace workloads to appear..."
-          for i in $(seq 1 120); do
-            ARMADA_WORKLOAD_COUNT=$(kubectl --context kind-armada get deploy -n armada --no-headers 2>/dev/null | wc -l | tr -d ' ')
-            if [ "$ARMADA_WORKLOAD_COUNT" -gt 0 ]; then
-              break
-            fi
-            sleep 5
+          echo "Waiting for core Armada deployments to be created and available..."
+          for deployment in armada-server armada-scheduler armada-event-ingester armada-executor; do
+            kubectl --context kind-armada wait --for=create --timeout=420s -n armada deployment/$deployment
+            kubectl --context kind-armada wait --for=condition=Available --timeout=420s -n armada deployment/$deployment
           done
-
-          ARMADA_WORKLOAD_COUNT=$(kubectl --context kind-armada get deploy -n armada --no-headers 2>/dev/null | wc -l | tr -d ' ')
-          if [ "$ARMADA_WORKLOAD_COUNT" -eq 0 ]; then
-            echo "Timed out waiting for Armada deployments in namespace armada"
-            kubectl --context kind-armada get pods -n armada-system || true
-            kubectl --context kind-armada get deploy -n armada || true
-            kubectl --context kind-armada get pods -n armada || true
-            kubectl --context kind-armada get events -n armada --sort-by=.metadata.creationTimestamp | tail -n 50 || true
-            exit 1
-          fi
-
-          echo "Waiting for Armada deployments to become available..."
-          ARMADA_DEPLOYMENTS=$(kubectl --context kind-armada get deploy -n armada -o name)
-          if [ -n "$ARMADA_DEPLOYMENTS" ]; then
-            while IFS= read -r deployment; do
-              kubectl --context kind-armada wait --for=condition=Available --timeout=330s -n armada "$deployment"
-            done <<< "$ARMADA_DEPLOYMENTS"
-          fi
 
           echo "Waiting for Armada migration jobs to complete (if any)..."
           ARMADA_JOBS=$(kubectl --context kind-armada get jobs -n armada -o name 2>/dev/null || true)
@@ -152,15 +131,15 @@ jobs:
           kubectl --context kind-armada get deploy -n armada
           kubectl --context kind-armada get jobs -n armada || true
           kubectl --context kind-armada get pods -n armada
-        timeout-minutes: 10
+        timeout-minutes: 15
 
-      - name: Verify Armada is running
+      - name: Verify Armada core endpoints
         run: |
-          echo "Checking Armada pods..."
-          kubectl --context kind-armada get pods -n armada-system
+          set -euo pipefail
+          echo "Verifying core Armada deployment and service..."
+          kubectl --context kind-armada wait --for=condition=Available --timeout=60s -n armada deployment/armada-server
+          kubectl --context kind-armada get svc -n armada armada-server
           kubectl --context kind-armada get pods -n armada
-          echo "Checking NodePort services..."
-          kubectl --context kind-armada get svc -n armada
 
       - name: Install armadactl
         run: |
