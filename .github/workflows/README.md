@@ -11,6 +11,7 @@ This directory contains GitHub Actions workflows for automated CI/CD of the Arma
 **Purpose**: Continuous integration - validates code quality and builds
 
 **Steps**:
+
 - Runs on multiple Node.js versions (18.x, 20.x) for compatibility
 - Installs dependencies
 - Runs ESLint for code quality
@@ -26,6 +27,7 @@ This directory contains GitHub Actions workflows for automated CI/CD of the Arma
 **Purpose**: Automated release management using conventional commits
 
 **How it works**:
+
 - Analyzes commit messages following [Conventional Commits](https://www.conventionalcommits.org/)
 - Creates/updates a release PR with:
   - Auto-generated changelog
@@ -34,6 +36,7 @@ This directory contains GitHub Actions workflows for automated CI/CD of the Arma
 - When the release PR is merged, creates a GitHub release
 
 **Commit Message Format**:
+
 ```
 feat: add new feature (minor version bump)
 fix: bug fix (patch version bump)
@@ -48,6 +51,7 @@ chore: maintenance (no version bump)
 **Purpose**: Publishes the extension to Visual Studio Code Marketplace
 
 **Steps**:
+
 - Checks out the repository source code
 - Installs dependencies
 - Runs linter and tests
@@ -84,7 +88,9 @@ To enable automatic publishing to the VS Code Marketplace, you need to:
 
 ### For Release Please
 
-No additional setup required - uses the default `GITHUB_TOKEN` with appropriate permissions.
+No additional setup required by default - uses `GITHUB_TOKEN` with appropriate permissions.
+
+Optional: add a repository secret named `GH_RELEASE_TOKEN` to override `GITHUB_TOKEN` for `release-please` runs.
 
 ## Gitflow Strategy
 
@@ -96,11 +102,11 @@ feature branches → dev → main → releases
 
 1. **Development**: Create feature branches and open PRs to `dev`
    - CI workflow validates the changes
-   
+
 2. **Staging for Release**: Merge `dev` into `main`
    - CI workflow validates
    - Release Please creates/updates a release PR
-   
+
 3. **Release**: Merge the release PR
    - GitHub release is created automatically
    - Publish workflow deploys to marketplace

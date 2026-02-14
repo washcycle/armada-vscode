@@ -7,8 +7,6 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Add environment for additional protection before publishing
-    environment: production
     permissions:
       contents: read
 
