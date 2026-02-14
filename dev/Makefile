@@ -89,10 +89,12 @@ install-pulsar:
 	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-pulsar-ci:
-	helm upgrade --install pulsar apache/pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace -f $(PULSAR_VALUES_CI) --wait --timeout $(HELM_TIMEOUT)
+	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/pulsar-standalone.yaml
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=180s -n $(DATA_NAMESPACE) deployment/pulsar
 
 uninstall-pulsar:
 	helm uninstall pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/pulsar-standalone.yaml --ignore-not-found
 
 install-redis:
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)

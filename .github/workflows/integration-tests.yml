@@ -90,7 +90,7 @@ jobs:
         run: |
           # Pre-pull common images in parallel to speed up setup
           docker pull bitnami/postgresql:16 &
-          docker pull apache/pulsar:3.0.0 &
+          docker pull apachepulsar/pulsar:3.3.2 &
           docker pull redis:7-alpine &
           wait
         continue-on-error: true
