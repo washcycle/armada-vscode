@@ -112,7 +112,21 @@ jobs:
 
           echo "Waiting for core Armada deployments to be created and available..."
           for deployment in armada-server armada-scheduler armada-event-ingester armada-executor; do
-            kubectl --context kind-armada wait --for=create --timeout=420s -n armada deployment/$deployment
+            for i in $(seq 1 84); do
+              if kubectl --context kind-armada get deployment/$deployment -n armada >/dev/null 2>&1; then
+                break
+              fi
+              sleep 5
+            done
+
+            if ! kubectl --context kind-armada get deployment/$deployment -n armada >/dev/null 2>&1; then
+              echo "Timed out waiting for deployment/$deployment to be created in namespace armada"
+              kubectl --context kind-armada get deploy -n armada || true
+              kubectl --context kind-armada get pods -n armada || true
+              kubectl --context kind-armada get events -n armada --sort-by=.metadata.creationTimestamp | tail -n 50 || true
+              exit 1
+            fi
+
             kubectl --context kind-armada wait --for=condition=Available --timeout=420s -n armada deployment/$deployment
           done
 

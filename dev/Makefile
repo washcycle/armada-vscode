@@ -164,7 +164,10 @@ apply-armada-crs: ## Apply the Armada CRs that stand up the demo install
 	kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR)
 
 apply-armada-crs-ci: ## Apply a minimal Armada CR set for CI
-	kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_CI)
+	@set -e; \
+		for cr in $(ARMADA_CRS_CI); do \
+			kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $$cr; \
+		done
 
 delete-armada-crs: ## Delete the demo Armada CRs
 	kubectl --context $(KIND_CONTEXT) delete -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR) --ignore-not-found
