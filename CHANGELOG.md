@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.1](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.0...armada-vscode-v0.2.1) (2026-02-14)
+
+
+### Bug Fixes
+
+* add Lookout CR application to integration tests workflow ([7ea46ff](https://github.com/washcycle/armada-vscode/commit/7ea46ffcca8863514dc6bf935577522602ad6912))
+* add workflow_dispatch to publish workflow for manual triggering ([ce1c962](https://github.com/washcycle/armada-vscode/commit/ce1c9629f7880e3e157c608886c5b47cdf6aa25d))
+* align engines.vscode with @types/vscode version requirement ([4fc4de5](https://github.com/washcycle/armada-vscode/commit/4fc4de5b3bcbebf3b6124ea4510abfafe4d94c5c))
+* enhance integration tests and improve resource limits for Redis and Pulsar deployments ([efc55af](https://github.com/washcycle/armada-vscode/commit/efc55af67fac3a891a64b52c4f3c9f52c5bf7ce0))
+* improve deployment wait logic in integration tests and enhance CR application in Makefile ([2437b7c](https://github.com/washcycle/armada-vscode/commit/2437b7c77315746ade291aa15be74b598edcb5e8))
+* increase timeout for Armada readiness checks and update CI configuration for minimal deployments ([9b02a2f](https://github.com/washcycle/armada-vscode/commit/9b02a2f47c79cfed9d66992582a23c89541de0d7))
+* increase timeout for waiting on Armada deployments and improve job completion checks ([75f7f5b](https://github.com/washcycle/armada-vscode/commit/75f7f5bf9d61831829385443fa77d1ba3ef42174))
+* update CI and publish workflows to install Xvfb and run tests with xvfb-run ([c161014](https://github.com/washcycle/armada-vscode/commit/c161014e1b52936a386b11c2ea236f5fe0e7e6f6))
+* update Docker image versions and enhance CI resource limits for Redis and PostgreSQL ([07b291a](https://github.com/washcycle/armada-vscode/commit/07b291a66cc7d9f31c8f84ecf7211095da23c824))
+* update engines.vscode to ^1.109.0 to match @types/vscode ([15b7639](https://github.com/washcycle/armada-vscode/commit/15b7639e6bc98df1820f8dc283c2f3520a71bfbe))
+* update Pulsar image version and adjust installation steps in Makefile ([152daa6](https://github.com/washcycle/armada-vscode/commit/152daa65f9f846db4e020e4869ef5d948cbc3c52))
+* update pulsar URL in configuration files to use the correct service address ([b9328c3](https://github.com/washcycle/armada-vscode/commit/b9328c3858a5f522890a95c177efd1a1a15c697c))
+* wait for lookout deployment to be created before checking availability ([61b3212](https://github.com/washcycle/armada-vscode/commit/61b3212fd984f0ecb36a6f00146f0da4e5fc8527))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @types/node from 20.19.25 to 25.2.0 ([338d646](https://github.com/washcycle/armada-vscode/commit/338d646335c2b8e34e70b024864c99305e5c62dc))
+* **deps-dev:** bump @types/vscode from 1.106.0 to 1.109.0 ([c07961f](https://github.com/washcycle/armada-vscode/commit/c07961fe866d3666e1eb1998034904256e5958fb))
+* **deps-dev:** bump @types/vscode from 1.106.0 to 1.109.0 ([ce145b6](https://github.com/washcycle/armada-vscode/commit/ce145b68fc501898c253815ee0a4d3fb78870ba7))
+* **deps-dev:** bump @typescript-eslint/parser from 8.46.4 to 8.54.0 ([89b1320](https://github.com/washcycle/armada-vscode/commit/89b1320ba11eace972d8b3a97b3914f471500a43))
+* **deps-dev:** bump glob from 13.0.0 to 13.0.1 ([bbec78a](https://github.com/washcycle/armada-vscode/commit/bbec78a81052fd74d9cc7229ac95b2eaa3763d8f))
+
 ## [0.2.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.1.1...armada-vscode-v0.2.0) (2026-02-14)
 
 
