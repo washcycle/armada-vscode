@@ -17,4 +17,4 @@ spec:
         dbname: lookout
         sslmode: disable
     pulsar:
-      URL: pulsar://pulsar-broker.data.svc.cluster.local:6650
+      URL: pulsar://pulsar.data.svc.cluster.local:6650

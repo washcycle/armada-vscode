@@ -19,7 +19,7 @@ spec:
       armadaUrl: armada-server.armada.svc.cluster.local:50051
       forceNoTls: true
     pulsar:
-      URL: pulsar://pulsar-broker.data.svc.cluster.local:6650
+      URL: pulsar://pulsar.data.svc.cluster.local:6650
     postgres:
       connection:
         host: postgres.data.svc.cluster.local

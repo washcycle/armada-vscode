@@ -10,7 +10,7 @@ spec:
     tag: latest
   applicationConfig:
     pulsar:
-      URL: pulsar://pulsar-broker.data.svc.cluster.local:6650
+      URL: pulsar://pulsar.data.svc.cluster.local:6650
     redis:
       addrs:
         - redis.data.svc.cluster.local:6379
