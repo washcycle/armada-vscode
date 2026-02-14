@@ -70,6 +70,21 @@ After modifying code:
 2. Reload the Extension Development Host (`Ctrl+R` or `Cmd+R`)
 3. Test your changes
 
+### Running Integration Tests
+
+The extension includes comprehensive integration tests that verify all commands:
+
+```bash
+# Run all integration tests
+npm test
+
+# Set up local Armada for testing (optional but recommended)
+cd dev
+make up
+```
+
+Tests are automatically run in CI when you push changes. See [`src/test/README.md`](src/test/README.md) for more information about the test suite.
+
 ### Code Organization
 
 - **Commands** (`src/commands/`): User-facing actions

@@ -1,0 +1,19 @@
+apiVersion: armadaproject.io/v1beta1
+kind: Queue
+metadata:
+  name: test
+  namespace: armada
+spec:
+  permissions:
+  - subjects:
+    - name: anonymous
+      kind: User
+    verbs:
+    - submit
+    - cancel
+    - reprioritize
+    - watch
+  priorityFactor: 1.0
+  resourceLimits:
+    cpu: 100.0
+    memory: 100.0

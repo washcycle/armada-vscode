@@ -1,0 +1,8 @@
+currentContext: test
+contexts:
+  - name: test
+    armadaUrl: localhost:30002
+    execTimeout: 2m
+  - name: alternative
+    armadaUrl: localhost:30002
+    execTimeout: 1m

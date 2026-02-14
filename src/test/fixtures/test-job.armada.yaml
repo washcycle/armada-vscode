@@ -1,0 +1,26 @@
+queue: test
+jobSetId: test-job-set
+jobs:
+  - priority: 0
+    namespace: default
+    labels:
+      app: test
+      environment: integration-test
+    podSpecs:
+      - terminationGracePeriodSeconds: 0
+        restartPolicy: Never
+        containers:
+          - name: test-job
+            image: busybox:latest
+            imagePullPolicy: IfNotPresent
+            command:
+              - echo
+            args:
+              - "Integration test job"
+            resources:
+              limits:
+                memory: 64Mi
+                cpu: 150m
+              requests:
+                memory: 64Mi
+                cpu: 150m

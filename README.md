@@ -134,6 +134,14 @@ npm run watch
 # Press F5 in VSCode to launch Extension Development Host
 ```
 
+### Running Tests
+
+```bash
+# Run integration tests
+npm test
+```
+
+The integration tests verify all extension commands and can run against a local Armada instance. See [`src/test/README.md`](src/test/README.md) for more details.
 ## CI/CD
 
 This project uses GitHub Actions for automated building, testing, and publishing:
