@@ -171,6 +171,12 @@ export class LookoutClient {
             const req = client.request(options, (res) => {
                 let data = '';
 
+                res.statusCode = res.statusCode || 0;
+                if (res.statusCode < 200 || res.statusCode >= 300) {
+                    reject(new Error(`HTTP error: ${res.statusCode} ${res.statusMessage}`));
+                    return;
+                }
+
                 res.on('data', (chunk) => {
                     data += chunk;
                 });
