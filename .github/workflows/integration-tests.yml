@@ -106,7 +106,19 @@ jobs:
         run: |
           echo "Applying Lookout CR to create queue table..."
           kubectl --context kind-armada apply -n armada -f dev/operator/quickstart/crs/lookout.yaml
+
+          echo "Waiting for lookout migration job to complete..."
           kubectl --context kind-armada wait --for=condition=complete --timeout=120s -n armada job/armada-lookout-migration
+
+          echo "Waiting for lookout deployment to be created..."
+          for i in $(seq 1 60); do
+            if kubectl --context kind-armada get deployment/armada-lookout -n armada >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+
+          echo "Waiting for lookout deployment to be available..."
           kubectl --context kind-armada wait --for=condition=Available --timeout=120s -n armada deployment/armada-lookout
 
       - name: Wait for Armada to be ready
