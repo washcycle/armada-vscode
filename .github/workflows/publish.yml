@@ -3,6 +3,12 @@ name: Publish Extension
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name to publish (e.g., armada-vscode-v0.2.0)'
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -16,7 +22,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
