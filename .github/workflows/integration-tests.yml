@@ -89,9 +89,9 @@ jobs:
       - name: Pre-pull common images (background)
         run: |
           # Pre-pull common images in parallel to speed up setup
-          docker pull bitnami/postgresql:16 &
+          docker pull postgres:17-alpine &
           docker pull apachepulsar/pulsar:3.3.2 &
-          docker pull redis:7-alpine &
+          docker pull redis:7.4-alpine &
           wait
         continue-on-error: true
 

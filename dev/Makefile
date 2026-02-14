@@ -26,7 +26,20 @@ POSTGRES_VALUES_CI := $(MANIFEST_DIR)/postgres.values.ci.yaml
 
 up: kind-create helm-repos install-cert-manager install-armada-deps install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Stand up a kind cluster with Armada via Helm + Operator
 
-up-ci: kind-create helm-repos install-cert-manager install-prometheus-crds install-armada-deps-ci install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Minimal CI setup with reduced resources
+up-ci: ## Minimal CI setup with reduced resources
+	@set -e; \
+		$(MAKE) kind-create; \
+		$(MAKE) helm-repos-ci; \
+		$(MAKE) install-cert-manager & p1=$$!; \
+		$(MAKE) install-prometheus-crds & p2=$$!; \
+		$(MAKE) install-armada-deps-ci & p3=$$!; \
+		wait $$p1; \
+		wait $$p2; \
+		wait $$p3; \
+		$(MAKE) install-armada-operator; \
+		$(MAKE) patch-operator-rbac; \
+		$(MAKE) apply-priority-class; \
+		$(MAKE) apply-armada-crs
 
 down: delete-armada-crs delete-priority-class uninstall-armada-operator uninstall-armada-deps uninstall-cert-manager kind-delete ## Tear everything back down
 
@@ -62,9 +75,13 @@ helm-repos: ## Add/update Helm repos required for the demo stack
 	helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null		
 	helm repo update >/dev/null
 
+helm-repos-ci: ## Add/update only Helm repos needed for CI
+	helm repo add gresearch https://g-research.github.io/charts >/dev/null
+	helm repo update >/dev/null
+
 install-cert-manager: ## Install cert-manager into the kind cluster
 	kubectl --context $(KIND_CONTEXT) apply -f $(CERT_MANAGER_MANIFEST)
-	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=300s -n $(CERT_MANAGER_NAMESPACE) deploy/cert-manager deploy/cert-manager-cainjector deploy/cert-manager-webhook || true
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=330s -n $(CERT_MANAGER_NAMESPACE) deploy/cert-manager deploy/cert-manager-cainjector deploy/cert-manager-webhook || true
 
 install-prometheus-crds: ## Install Prometheus Operator CRDs (needed for PodMonitor resources)
 	kubectl --context $(KIND_CONTEXT) apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.70.0/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml || true
@@ -95,7 +112,7 @@ install-pulsar:
 
 install-pulsar-ci:
 	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/pulsar-standalone.yaml
-	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=180s -n $(DATA_NAMESPACE) deployment/pulsar
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=210s -n $(DATA_NAMESPACE) deployment/pulsar
 
 uninstall-pulsar:
 	helm uninstall pulsar -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
@@ -106,7 +123,7 @@ install-redis:
 
 install-redis-ci:
 	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/redis-simple.yaml
-	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=60s -n $(DATA_NAMESPACE) deployment/redis
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=90s -n $(DATA_NAMESPACE) deployment/redis
 
 uninstall-redis:
 	helm uninstall redis -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
@@ -117,7 +134,7 @@ install-postgres:
 
 install-postgres-ci:
 	kubectl --context $(KIND_CONTEXT) apply -f operator/quickstart/postgres-simple.yaml
-	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=120s -n $(DATA_NAMESPACE) deployment/postgres
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=150s -n $(DATA_NAMESPACE) deployment/postgres
 
 uninstall-postgres:
 	helm uninstall postgres -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
