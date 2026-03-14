@@ -39,7 +39,10 @@ jobs:
       - name: Run linter
         run: npm run lint
 
-      - name: Compile TypeScript
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build extension
         run: npm run compile
 
       - name: Run tests
