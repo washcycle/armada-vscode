@@ -256,7 +256,7 @@
   },
   "scripts": {
     "vscode:prepublish": "node esbuild.mjs --production",
-    "compile": "node esbuild.mjs",
+    "compile": "node esbuild.mjs && npm run copy-test-fixtures",
     "typecheck": "tsc --noEmit",
     "copy-proto": "mkdir -p out/proto && cp -r src/proto/* out/proto/",
     "copy-test-fixtures": "mkdir -p out/test/fixtures && if [ -d src/test/fixtures ]; then cp src/test/fixtures/* out/test/fixtures/; fi",
