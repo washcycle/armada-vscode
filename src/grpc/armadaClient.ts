@@ -54,7 +54,7 @@ export class ArmadaClient {
 
         // Load and create the client
         const credentials = grpc.credentials.createInsecure();
-        const protoRoot = path.join(__dirname, '..', 'proto');
+        const protoRoot = path.join(__dirname, 'proto');
         const protoOptions = {
             keepCase: true,
             longs: String,
@@ -123,7 +123,7 @@ export class ArmadaClient {
         const credentials = grpc.credentials.createInsecure(); // TODO: Add TLS support
 
         // Set up proto include paths
-        const protoRoot = path.join(__dirname, '..', 'proto');
+        const protoRoot = path.join(__dirname, 'proto');
         const protoOptions = {
             keepCase: true,
             longs: String,

@@ -1,6 +1,11 @@
 .vscode/**
 .vscode-test/**
 src/**
+out/
+.beads/
+.claude/
+openspec/
+dev/
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
@@ -8,9 +13,10 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 eslint.config.mjs
 **/*.map
-**/*.ts
 node_modules/**
 .github/**
 examples/**
 *.md
 !README.md
+!dist/**
+dist/**/*.map

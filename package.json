@@ -50,7 +50,7 @@
     "onCommand:armada.clearMonitoredJobSets",
     "onCommand:armada.createQueue"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -255,13 +255,15 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && npm run copy-proto && npm run copy-test-fixtures",
+    "vscode:prepublish": "node esbuild.mjs --production",
+    "compile": "node esbuild.mjs",
+    "compile:tests": "tsc -p ./ && npm run copy-proto && npm run copy-test-fixtures",
+    "typecheck": "tsc --noEmit",
     "copy-proto": "mkdir -p out/proto && cp -r src/proto/* out/proto/",
     "copy-test-fixtures": "mkdir -p out/test/fixtures && if [ -d src/test/fixtures ]; then cp src/test/fixtures/* out/test/fixtures/; fi",
     "download-protos": "bash scripts/download-protos.sh",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
+    "watch": "node esbuild.mjs --watch",
+    "pretest": "npm run compile && npm run compile:tests && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "package": "vsce package"
@@ -270,14 +272,15 @@
     "@types/glob": "^8.1.0",
     "@types/js-yaml": "^4.0.9",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.3.0",
     "@types/vscode": "^1.109.0",
     "@typescript-eslint/eslint-plugin": "^8.18.1",
-    "@typescript-eslint/parser": "^8.55.0",
+    "@typescript-eslint/parser": "^8.56.0",
     "@vscode/test-electron": "^2.4.1",
-    "mocha": "^10.3.0",
+    "esbuild": "^0.27.4",
     "eslint": "^9.39.2",
     "glob": "^13.0.3",
+    "mocha": "^10.3.0",
     "typescript": "^5.7.2"
   },
   "dependencies": {
