@@ -1,5 +1,5 @@
 import * as esbuild from 'esbuild';
-import { cpSync } from 'fs';
+import { cpSync, rmSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -8,6 +8,11 @@ const __dirname = dirname(__filename);
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
+
+// Clean dist/ before production builds to remove stale artifacts (e.g. sourcemaps from dev)
+if (production) {
+    rmSync(join(__dirname, 'dist'), { recursive: true, force: true });
+}
 
 /** @type {import('esbuild').Plugin} */
 const copyProtoPlugin = {

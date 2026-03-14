@@ -19,3 +19,4 @@ examples/**
 *.md
 !README.md
 !dist/**
+dist/**/*.map
