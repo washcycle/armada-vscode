@@ -152,12 +152,15 @@ install-armada-operator: ## Install the released Armada Operator chart
 
 wait-for-operator-webhook: ## Wait for the operator webhook to be ready before applying CRs
 	@echo "Waiting for operator webhook to be ready..."
-	@for i in $$(seq 1 30); do \
+	@for i in $$(seq 1 60); do \
 		if kubectl --context $(KIND_CONTEXT) get endpoints armada-operator-webhook-service -n $(ARMADA_SYSTEM_NAMESPACE) -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then \
-			echo "Operator webhook is ready"; \
-			break; \
+			echo "Operator webhook endpoint is ready, verifying pod readiness..."; \
+			if kubectl --context $(KIND_CONTEXT) wait --for=condition=Ready --timeout=60s -n $(ARMADA_SYSTEM_NAMESPACE) pod -l control-plane=controller-manager 2>/dev/null; then \
+				echo "Operator webhook is ready"; \
+				break; \
+			fi; \
 		fi; \
-		echo "  waiting... ($$i/30)"; \
+		echo "  waiting... ($$i/60)"; \
 		sleep 2; \
 	done
 
