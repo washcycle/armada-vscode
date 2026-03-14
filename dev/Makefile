@@ -43,6 +43,7 @@ up-ci: ## Minimal CI setup with reduced resources
 		wait $$p3; \
 		$(MAKE) install-armada-operator; \
 		$(MAKE) patch-operator-rbac; \
+		$(MAKE) wait-for-operator-webhook; \
 		$(MAKE) apply-priority-class; \
 		$(MAKE) apply-armada-crs-ci
 
@@ -148,6 +149,17 @@ uninstall-postgres:
 install-armada-operator: ## Install the released Armada Operator chart
 	helm upgrade --install armada-operator gresearch/armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace --wait --timeout $(HELM_TIMEOUT) \
 		--set controllerManager.kubeRbacProxy.image.repository=registry.k8s.io/kubebuilder/kube-rbac-proxy
+
+wait-for-operator-webhook: ## Wait for the operator webhook to be ready before applying CRs
+	@echo "Waiting for operator webhook to be ready..."
+	@for i in $$(seq 1 30); do \
+		if kubectl --context $(KIND_CONTEXT) get endpoints armada-operator-webhook-service -n $(ARMADA_SYSTEM_NAMESPACE) -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null | grep -q .; then \
+			echo "Operator webhook is ready"; \
+			break; \
+		fi; \
+		echo "  waiting... ($$i/30)"; \
+		sleep 2; \
+	done
 
 patch-operator-rbac: ## Patch the operator ClusterRole to allow binoculars deployment
 	kubectl --context $(KIND_CONTEXT) apply -f $(OPERATOR_RBAC_PATCH)
