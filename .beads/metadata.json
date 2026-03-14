@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "armada_vscode",
+  "project_id": "c3d7f60c-c213-45a9-90e1-fdd71929e457"
+}
