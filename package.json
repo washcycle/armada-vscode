@@ -256,13 +256,14 @@
   },
   "scripts": {
     "vscode:prepublish": "node esbuild.mjs --production",
-    "compile": "node esbuild.mjs && npm run copy-test-fixtures",
+    "compile": "node esbuild.mjs",
+    "compile:tests": "tsc -p ./ && npm run copy-proto && npm run copy-test-fixtures",
     "typecheck": "tsc --noEmit",
     "copy-proto": "mkdir -p out/proto && cp -r src/proto/* out/proto/",
     "copy-test-fixtures": "mkdir -p out/test/fixtures && if [ -d src/test/fixtures ]; then cp src/test/fixtures/* out/test/fixtures/; fi",
     "download-protos": "bash scripts/download-protos.sh",
     "watch": "node esbuild.mjs --watch",
-    "pretest": "npm run compile && npm run lint",
+    "pretest": "npm run compile && npm run compile:tests && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "node ./out/test/runTest.js",
     "package": "vsce package"
