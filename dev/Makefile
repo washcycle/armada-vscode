@@ -146,7 +146,8 @@ uninstall-postgres:
 	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/postgres-simple.yaml --ignore-not-found
 
 install-armada-operator: ## Install the released Armada Operator chart
-	helm upgrade --install armada-operator gresearch/armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace --wait --timeout $(HELM_TIMEOUT)
+	helm upgrade --install armada-operator gresearch/armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace --wait --timeout $(HELM_TIMEOUT) \
+		--set controllerManager.kubeRbacProxy.image.repository=registry.k8s.io/kubebuilder/kube-rbac-proxy
 
 patch-operator-rbac: ## Patch the operator ClusterRole to allow binoculars deployment
 	kubectl --context $(KIND_CONTEXT) apply -f $(OPERATOR_RBAC_PATCH)
