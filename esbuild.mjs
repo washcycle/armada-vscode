@@ -13,13 +13,24 @@ const watch = process.argv.includes('--watch');
 const copyProtoPlugin = {
     name: 'copy-proto',
     setup(build) {
-        build.onEnd(() => {
-            cpSync(
-                join(__dirname, 'src', 'proto'),
-                join(__dirname, 'dist', 'proto'),
-                { recursive: true }
-            );
-            console.log('[esbuild] Copied src/proto/ to dist/proto/');
+        build.onEnd((result) => {
+            // If the build failed, skip copying so we don't mask the original error.
+            if (result && Array.isArray(result.errors) && result.errors.length > 0) {
+                console.error('[esbuild] Skipping proto copy due to build errors.');
+                return;
+            }
+
+            try {
+                cpSync(
+                    join(__dirname, 'src', 'proto'),
+                    join(__dirname, 'dist', 'proto'),
+                    { recursive: true }
+                );
+                console.log('[esbuild] Copied src/proto/ to dist/proto/');
+            } catch (err) {
+                // Log copy failures but do not throw, to avoid hiding esbuild's own status.
+                console.error('[esbuild] Failed to copy src/proto/ to dist/proto/:', err);
+            }
         });
     }
 };
