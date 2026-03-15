@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.2](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.1...armada-vscode-v0.2.2) (2026-03-14)
+
+
+### Bug Fixes
+
+* bundle extension with esbuild to fix marketplace install ([#32](https://github.com/washcycle/armada-vscode/issues/32)) ([2b665c8](https://github.com/washcycle/armada-vscode/commit/2b665c855f19d4e992701e57c2c5afebc3e9fc70))
+* skip integration tests for release commits ([ecb758d](https://github.com/washcycle/armada-vscode/commit/ecb758dd0aea2d544cc4e17e921806b4aa443521))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @types/node from 25.2.3 to 25.3.0 ([c67adf5](https://github.com/washcycle/armada-vscode/commit/c67adf5c8e77f13ac6dacc5da981f9d2703eadaa))
+* **deps-dev:** bump @types/node from 25.2.3 to 25.3.0 ([a22a2b6](https://github.com/washcycle/armada-vscode/commit/a22a2b60226ea82c68f738aaf72fe232324990dc))
+* **deps-dev:** bump @typescript-eslint/parser from 8.55.0 to 8.56.0 ([ab97e5a](https://github.com/washcycle/armada-vscode/commit/ab97e5af4c304ebc696ace0a806e82550cd6ed21))
+* **deps-dev:** bump @typescript-eslint/parser from 8.55.0 to 8.56.0 ([8409b3d](https://github.com/washcycle/armada-vscode/commit/8409b3d11d43fdd88f265028b551a9da06992580))
+* **deps-dev:** bump minimatch ([6867cbb](https://github.com/washcycle/armada-vscode/commit/6867cbb85a81b5ffb20c0771e7547ddf46536ecc))
+* **deps-dev:** bump minimatch from 3.1.2 to 3.1.5 in the npm_and_yarn group across 1 directory ([ca36584](https://github.com/washcycle/armada-vscode/commit/ca36584c0fa749bc2b14a17f15ca7f6d76f8708d))
+
 ## [0.2.1](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.0...armada-vscode-v0.2.1) (2026-02-14)
 
 
