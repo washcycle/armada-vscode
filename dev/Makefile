@@ -11,6 +11,10 @@ CERT_MANAGER_NAMESPACE ?= cert-manager
 CERT_MANAGER_MANIFEST ?= https://github.com/cert-manager/cert-manager/releases/download/v1.14.5/cert-manager.yaml
 HELM_TIMEOUT ?= 15m
 
+# Image tags — overridable from CI to pin versions
+ARMADA_OPERATOR_IMAGE_TAG ?= latest
+ARMADA_IMAGE_TAG ?= latest
+
 MANIFEST_DIR := operator/quickstart
 ARMADA_CRS_DIR := $(MANIFEST_DIR)/crs
 ARMADA_CRS_CI := \
@@ -148,7 +152,9 @@ uninstall-postgres:
 
 install-armada-operator: ## Install the released Armada Operator chart
 	helm upgrade --install armada-operator gresearch/armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) --create-namespace --wait --timeout $(HELM_TIMEOUT) \
-		--set controllerManager.kubeRbacProxy.image.repository=registry.k8s.io/kubebuilder/kube-rbac-proxy
+		--set controllerManager.kubeRbacProxy.image.repository=registry.k8s.io/kubebuilder/kube-rbac-proxy \
+		--set controllerManager.manager.image.tag=$(ARMADA_OPERATOR_IMAGE_TAG) \
+		--set controllerManager.manager.imagePullPolicy=IfNotPresent
 
 wait-for-operator-webhook: ## Wait for the operator webhook to be ready before applying CRs
 	@echo "Waiting for operator webhook to be ready..."
@@ -179,10 +185,15 @@ delete-priority-class: ## Remove the demo PriorityClass
 apply-armada-crs: ## Apply the Armada CRs that stand up the demo install
 	kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR)
 
-apply-armada-crs-ci: ## Apply a minimal Armada CR set for CI
+apply-armada-crs-ci: ## Apply a minimal Armada CR set for CI (supports ARMADA_IMAGE_TAG override)
 	@set -e; \
 		for cr in $(ARMADA_CRS_CI); do \
-			kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $$cr; \
+			if [ "$(ARMADA_IMAGE_TAG)" != "latest" ]; then \
+				sed "s/tag: latest/tag: $(ARMADA_IMAGE_TAG)/" $$cr | \
+					kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f -; \
+			else \
+				kubectl --context $(KIND_CONTEXT) apply -n $(ARMADA_NAMESPACE) -f $$cr; \
+			fi; \
 		done
 
 delete-armada-crs: ## Delete the demo Armada CRs
