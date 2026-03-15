@@ -14,6 +14,22 @@ concurrency:
 permissions:
   contents: read
 
+# All Docker images used in CI — pinned for cacheability and reproducibility
+env:
+  KIND_NODE_IMAGE: kindest/node:v1.29.2
+  POSTGRES_IMAGE: postgres:17-alpine
+  PULSAR_IMAGE: apachepulsar/pulsar:3.3.2
+  REDIS_IMAGE: redis:7.4-alpine
+  KUBE_RBAC_PROXY_IMAGE: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.16.0
+  ARMADA_OPERATOR_IMAGE: gresearch/armada-operator:0.6.0
+  ARMADA_SERVER_IMAGE: gresearch/armada-server:0.20.28
+  ARMADA_SCHEDULER_IMAGE: gresearch/armada-scheduler:0.20.28
+  ARMADA_EVENT_INGESTER_IMAGE: gresearch/armada-event-ingester:0.20.28
+  ARMADA_EXECUTOR_IMAGE: gresearch/armada-executor:0.20.28
+  ARMADA_LOOKOUT_IMAGE: gresearch/armada-lookout:0.20.28
+  # Cache key version — bump to invalidate image cache
+  IMAGE_CACHE_VERSION: v1
+
 jobs:
   integration-test:
     # Skip integration tests for release commits
@@ -25,22 +41,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ── Parallel setup: Node + system deps + Docker image cache ──
+      # These run in the background while kind cluster is created
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y curl xvfb
-
-      - name: Setup Docker
-        uses: docker/setup-buildx-action@v3
 
       - name: Cache CLI tools
         uses: actions/cache@v4
@@ -84,34 +92,133 @@ jobs:
           restore-keys: |
             helm-charts-
 
-      - name: Cache kind images
+      # ── Docker image cache ──
+      # Save all images to a tar on first run, restore from cache on subsequent runs.
+      # This avoids pulling ~14 images from Docker Hub / registries on every run.
+
+      - name: Cache Docker images
+        id: docker-cache
         uses: actions/cache@v4
         with:
-          path: /tmp/kind-image-cache
-          key: kind-images-${{ runner.os }}-v2
+          path: /tmp/docker-image-cache
+          key: docker-images-${{ runner.os }}-${{ env.IMAGE_CACHE_VERSION }}-${{ env.ARMADA_SERVER_IMAGE }}
           restore-keys: |
-            kind-images-${{ runner.os }}-
+            docker-images-${{ runner.os }}-${{ env.IMAGE_CACHE_VERSION }}-
 
-      - name: Pre-pull common images (background)
+      - name: Load cached Docker images
+        if: steps.docker-cache.outputs.cache-hit == 'true'
         run: |
-          # Pre-pull common images in parallel to speed up setup
-          docker pull postgres:17-alpine &
-          docker pull apachepulsar/pulsar:3.3.2 &
-          docker pull redis:7.4-alpine &
-          wait
-        continue-on-error: true
+          echo "Loading cached Docker images..."
+          if [ -f /tmp/docker-image-cache/images.tar ]; then
+            docker load < /tmp/docker-image-cache/images.tar
+            echo "Loaded cached images successfully"
+          fi
 
-      - name: Setup Armada with kind
+      - name: Pull Docker images (on cache miss)
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        run: |
+          echo "Pulling all Docker images in parallel..."
+          docker pull $POSTGRES_IMAGE &
+          docker pull $PULSAR_IMAGE &
+          docker pull $REDIS_IMAGE &
+          docker pull $KUBE_RBAC_PROXY_IMAGE &
+          docker pull $ARMADA_OPERATOR_IMAGE &
+          docker pull $ARMADA_SERVER_IMAGE &
+          docker pull $ARMADA_SCHEDULER_IMAGE &
+          docker pull $ARMADA_EVENT_INGESTER_IMAGE &
+          docker pull $ARMADA_EXECUTOR_IMAGE &
+          docker pull $ARMADA_LOOKOUT_IMAGE &
+          wait
+          echo "All images pulled"
+
+      - name: Save Docker images to cache
+        if: steps.docker-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/docker-image-cache
+          echo "Saving Docker images to cache..."
+          docker save \
+            $POSTGRES_IMAGE \
+            $PULSAR_IMAGE \
+            $REDIS_IMAGE \
+            $KUBE_RBAC_PROXY_IMAGE \
+            $ARMADA_OPERATOR_IMAGE \
+            $ARMADA_SERVER_IMAGE \
+            $ARMADA_SCHEDULER_IMAGE \
+            $ARMADA_EVENT_INGESTER_IMAGE \
+            $ARMADA_EXECUTOR_IMAGE \
+            $ARMADA_LOOKOUT_IMAGE \
+            -o /tmp/docker-image-cache/images.tar
+          echo "Saved $(du -h /tmp/docker-image-cache/images.tar | cut -f1) of images"
+
+      # ── Parallel: npm ci + apt-get + kind create ──
+      # Overlap independent setup steps to save ~16s
+
+      - name: Parallel setup (npm, apt, kind)
+        run: |
+          set -e
+
+          # Start npm install in background
+          npm ci &
+          NPM_PID=$!
+
+          # Start apt-get install in background
+          (sudo apt-get update && sudo apt-get install -y curl xvfb) &
+          APT_PID=$!
+
+          # Create kind cluster in foreground (needs kubectl, kind already installed)
+          echo "Creating kind cluster..."
+          kind create cluster --name armada --config dev/operator/kind-config.yaml --image $KIND_NODE_IMAGE
+
+          # Load images into kind while npm/apt finish
+          echo "Loading images into kind cluster..."
+          kind load docker-image --name armada \
+            $POSTGRES_IMAGE \
+            $PULSAR_IMAGE \
+            $REDIS_IMAGE \
+            $KUBE_RBAC_PROXY_IMAGE \
+            $ARMADA_OPERATOR_IMAGE \
+            $ARMADA_SERVER_IMAGE \
+            $ARMADA_SCHEDULER_IMAGE \
+            $ARMADA_EVENT_INGESTER_IMAGE \
+            $ARMADA_EXECUTOR_IMAGE \
+            $ARMADA_LOOKOUT_IMAGE
+
+          # Wait for background jobs
+          echo "Waiting for npm ci..."
+          wait $NPM_PID
+          echo "Waiting for apt-get..."
+          wait $APT_PID
+          echo "Parallel setup complete"
+
+      # ── Armada setup (kind cluster already exists with images loaded) ──
+
+      - name: Setup Armada components
         working-directory: dev
         run: |
-          echo "Setting up minimal Armada cluster for CI..."
-          make up-ci
-        timeout-minutes: 30
+          echo "Setting up Armada components..."
+          make helm-repos-ci
+          make install-cert-manager & p1=$!
+          make install-prometheus-crds & p2=$!
+          make install-armada-deps-ci & p3=$!
+          wait $p1
+          wait $p2
+          wait $p3
+          make install-armada-operator \
+            ARMADA_OPERATOR_IMAGE_TAG=$(echo $ARMADA_OPERATOR_IMAGE | cut -d: -f2)
+          make patch-operator-rbac
+          make wait-for-operator-webhook
+          make apply-priority-class
+          make apply-armada-crs-ci \
+            ARMADA_IMAGE_TAG=$(echo $ARMADA_SERVER_IMAGE | cut -d: -f2)
+        timeout-minutes: 15
 
       - name: Apply Lookout for database migrations
         run: |
           echo "Applying Lookout CR to create queue table..."
-          kubectl --context kind-armada apply -n armada -f dev/operator/quickstart/crs/lookout.yaml
+          ARMADA_IMAGE_TAG=$(echo $ARMADA_LOOKOUT_IMAGE | cut -d: -f2)
+          # Patch lookout CR with pinned tag
+          sed "s/tag: latest/tag: $ARMADA_IMAGE_TAG/" dev/operator/quickstart/crs/lookout.yaml | \
+            kubectl --context kind-armada apply -n armada -f -
 
           echo "Waiting for lookout migration job to complete..."
           kubectl --context kind-armada wait --for=condition=complete --timeout=120s -n armada job/armada-lookout-migration
