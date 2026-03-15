@@ -265,6 +265,7 @@
     "watch": "node esbuild.mjs --watch",
     "pretest": "npm run compile && npm run compile:tests && npm run lint",
     "lint": "eslint src --ext ts",
+    "pretest:unit": "npm run compile:tests",
     "test:unit": "mocha 'out/test/unit/**/*.test.js'",
     "test:integration": "node ./out/test/runTest.js",
     "test": "node ./out/test/runTest.js",
