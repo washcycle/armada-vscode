@@ -1,10 +1,8 @@
 name: Integration Tests
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * *'   # nightly at 2am UTC
   workflow_dispatch:
 
 concurrency:

@@ -1,0 +1,7 @@
+currentContext: test
+contexts:
+  test:
+    armadaUrl: localhost:30002
+  alternative:
+    armadaUrl: localhost:30003
+    binocularsUrl: localhost:30005
