@@ -82,6 +82,7 @@ export class ConfigManager {
         if (config.armadaUrl) {
             return {
                 armadaUrl: config.armadaUrl,
+                forceNoTls: (config as any).forceNoTls,
                 auth: this.extractAuth(config as any)
             };
         }
