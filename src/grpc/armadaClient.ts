@@ -4,6 +4,32 @@ import * as path from 'path';
 import { ResolvedConfig } from '../types/config';
 import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue } from '../types/armada';
 
+/**
+ * Select gRPC channel credentials for a given endpoint URL.
+ * Returns SSL credentials when the URL uses an `https://` scheme or targets
+ * port 443.  Passing `forceNoTls: true` always returns insecure credentials
+ * regardless of the URL (useful for development / plain-text servers).
+ */
+/**
+ * Strip any `http://` or `https://` scheme prefix from a URL so that the
+ * result can be used as a bare `host:port` gRPC target string.
+ */
+export function stripScheme(url: string): string {
+    return url.replace(/^https?:\/\//, '');
+}
+
+export function selectCredentials(url: string, forceNoTls?: boolean): grpc.ChannelCredentials {
+    if (forceNoTls) {
+        return grpc.credentials.createInsecure();
+    }
+    // Strip the scheme and path, then check whether the host:port portion ends with :443
+    const hostPort = url.replace(/^https?:\/\//, '').split('/')[0];
+    if (url.startsWith('https://') || hostPort.endsWith(':443')) {
+        return grpc.credentials.createSsl();
+    }
+    return grpc.credentials.createInsecure();
+}
+
 export class ArmadaClient {
     private submitClient: any;
     private eventClient: any;
@@ -53,7 +79,6 @@ export class ArmadaClient {
         }
 
         // Load and create the client
-        const credentials = grpc.credentials.createInsecure();
         const protoRoot = path.join(__dirname, 'proto');
         const protoOptions = {
             keepCase: true,
@@ -69,7 +94,7 @@ export class ArmadaClient {
         const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
         const client = new binocularsProto.binoculars.Binoculars(
             binocularsUrl,
-            credentials
+            this.getCredentials(binocularsUrl)
         );
 
         // Cache the client
@@ -115,12 +140,22 @@ export class ArmadaClient {
         }
     }
 
+    /**
+     * Determine gRPC channel credentials for a given URL.
+     * Uses TLS when the URL has an `https://` scheme or targets port 443,
+     * unless `forceNoTls` is set in the config.
+     */
+    private getCredentials(url: string): grpc.ChannelCredentials {
+        return selectCredentials(url, this.config.forceNoTls);
+    }
+
     private initializeClients(): void {
         if (this.initialized) {
             return;
         }
 
-        const credentials = grpc.credentials.createInsecure(); // TODO: Add TLS support
+        const credentials = this.getCredentials(this.config.armadaUrl);
+        const armadaTarget = stripScheme(this.config.armadaUrl);
 
         // Set up proto include paths
         const protoRoot = path.join(__dirname, 'proto');
@@ -138,7 +173,7 @@ export class ArmadaClient {
         const submitPackageDefinition = protoLoader.loadSync(submitProtoPath, protoOptions);
         const submitProto = grpc.loadPackageDefinition(submitPackageDefinition) as any;
         this.submitClient = new submitProto.api.Submit(
-            this.config.armadaUrl,
+            armadaTarget,
             credentials
         );
 
@@ -147,7 +182,7 @@ export class ArmadaClient {
         const eventPackageDefinition = protoLoader.loadSync(eventProtoPath, protoOptions);
         const eventProto = grpc.loadPackageDefinition(eventPackageDefinition) as any;
         this.eventClient = new eventProto.api.Event(
-            this.config.armadaUrl,
+            armadaTarget,
             credentials
         );
 
@@ -156,7 +191,7 @@ export class ArmadaClient {
         const jobPackageDefinition = protoLoader.loadSync(jobProtoPath, protoOptions);
         const jobProto = grpc.loadPackageDefinition(jobPackageDefinition) as any;
         this.jobsClient = new jobProto.api.Jobs(
-            this.config.armadaUrl,
+            armadaTarget,
             credentials
         );
 
@@ -171,7 +206,7 @@ export class ArmadaClient {
             const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
             this.binocularsClient = new binocularsProto.binoculars.Binoculars(
                 binocularsUrl,
-                credentials
+                this.getCredentials(binocularsUrl)
             );
             console.log('[Armada] Binoculars client initialized at:', binocularsUrl);
             if (!this.config.binocularsUrl) {
@@ -741,13 +776,38 @@ export class ArmadaClient {
      * Test connection to Armada server
      */
     async testConnection(): Promise<boolean> {
+        this.initializeClients();
         try {
-            this.initializeClients();
-            // Try to get a queue that likely doesn't exist - but should fail gracefully
             await this.getQueue('test-connection');
             return true;
-        } catch (error) {
-            // If we get a proper gRPC error, connection is working
+        } catch (error: any) {
+            const code: number | undefined = error?.code;
+            const msg: string = error?.message ?? '';
+
+            // gRPC status codes that indicate the transport is alive but the
+            // call was rejected at the application level (queue not found, etc.)
+            const APPLICATION_LEVEL_CODES = new Set([
+                2,  // UNKNOWN
+                5,  // NOT_FOUND
+                12, // UNIMPLEMENTED
+            ]);
+
+            if (code !== undefined && APPLICATION_LEVEL_CODES.has(code)) {
+                return true;
+            }
+
+            // TLS / transport keywords in error messages
+            const transportErrorPattern = /ssl|tls|handshake|certificate|transport|socket hang up/i;
+            if (transportErrorPattern.test(msg)) {
+                throw error;
+            }
+
+            // gRPC UNAVAILABLE (14) or INTERNAL (13) — transport-level issues
+            if (code === 14 || code === 13) {
+                throw error;
+            }
+
+            // Default: assume connection is working for any other error
             return true;
         }
     }

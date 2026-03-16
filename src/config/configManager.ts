@@ -72,6 +72,7 @@ export class ConfigManager {
                 armadaUrl: context.armadaUrl,
                 binocularsUrl: context.binocularsUrl,
                 binocularsUrlPattern: context.binocularsUrlPattern,
+                forceNoTls: context.forceNoTls,
                 currentContext: contextName,
                 auth: this.extractAuth(context)
             };
@@ -81,6 +82,7 @@ export class ConfigManager {
         if (config.armadaUrl) {
             return {
                 armadaUrl: config.armadaUrl,
+                forceNoTls: (config as any).forceNoTls,
                 auth: this.extractAuth(config as any)
             };
         }
