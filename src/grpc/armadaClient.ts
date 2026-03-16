@@ -4,6 +4,24 @@ import * as path from 'path';
 import { ResolvedConfig } from '../types/config';
 import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue } from '../types/armada';
 
+/**
+ * Select gRPC channel credentials for a given endpoint URL.
+ * Returns SSL credentials when the URL uses an `https://` scheme or targets
+ * port 443.  Passing `forceNoTls: true` always returns insecure credentials
+ * regardless of the URL (useful for development / plain-text servers).
+ */
+export function selectCredentials(url: string, forceNoTls?: boolean): grpc.ChannelCredentials {
+    if (forceNoTls) {
+        return grpc.credentials.createInsecure();
+    }
+    // Strip the scheme and path, then check whether the host:port portion ends with :443
+    const hostPort = url.replace(/^https?:\/\//, '').split('/')[0];
+    if (url.startsWith('https://') || hostPort.endsWith(':443')) {
+        return grpc.credentials.createSsl();
+    }
+    return grpc.credentials.createInsecure();
+}
+
 export class ArmadaClient {
     private submitClient: any;
     private eventClient: any;
@@ -53,7 +71,6 @@ export class ArmadaClient {
         }
 
         // Load and create the client
-        const credentials = grpc.credentials.createInsecure();
         const protoRoot = path.join(__dirname, 'proto');
         const protoOptions = {
             keepCase: true,
@@ -69,7 +86,7 @@ export class ArmadaClient {
         const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
         const client = new binocularsProto.binoculars.Binoculars(
             binocularsUrl,
-            credentials
+            this.getCredentials(binocularsUrl)
         );
 
         // Cache the client
@@ -115,12 +132,21 @@ export class ArmadaClient {
         }
     }
 
+    /**
+     * Determine gRPC channel credentials for a given URL.
+     * Uses TLS when the URL has an `https://` scheme or targets port 443,
+     * unless `forceNoTls` is set in the config.
+     */
+    private getCredentials(url: string): grpc.ChannelCredentials {
+        return selectCredentials(url, this.config.forceNoTls);
+    }
+
     private initializeClients(): void {
         if (this.initialized) {
             return;
         }
 
-        const credentials = grpc.credentials.createInsecure(); // TODO: Add TLS support
+        const credentials = this.getCredentials(this.config.armadaUrl);
 
         // Set up proto include paths
         const protoRoot = path.join(__dirname, 'proto');
@@ -171,7 +197,7 @@ export class ArmadaClient {
             const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
             this.binocularsClient = new binocularsProto.binoculars.Binoculars(
                 binocularsUrl,
-                credentials
+                this.getCredentials(binocularsUrl)
             );
             console.log('[Armada] Binoculars client initialized at:', binocularsUrl);
             if (!this.config.binocularsUrl) {

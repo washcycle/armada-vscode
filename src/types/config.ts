@@ -21,6 +21,7 @@ export interface ArmadaContext {
     armadaUrl: string;
     binocularsUrl?: string;
     binocularsUrlPattern?: string; // Pattern with {CLUSTER_ID} placeholder
+    forceNoTls?: boolean; // When true, use insecure (plaintext) gRPC even if TLS is detected
     openIdConnect?: OpenIdConnect;
     execAuth?: ExecAuth;
     basicAuth?: {
@@ -42,6 +43,7 @@ export interface ResolvedConfig {
     armadaUrl: string;
     binocularsUrl?: string;
     binocularsUrlPattern?: string; // Pattern with {CLUSTER_ID} placeholder
+    forceNoTls?: boolean; // When true, use insecure (plaintext) gRPC even if TLS is detected
     currentContext?: string;
     auth?: {
         type: 'oidc' | 'basic' | 'exec' | 'none';

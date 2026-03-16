@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { MockArmadaServer } from '../../mock/armadaServer';
-import { ArmadaClient } from '../../../grpc/armadaClient';
+import { ArmadaClient, selectCredentials } from '../../../grpc/armadaClient';
 import { ResolvedConfig } from '../../../types/config';
 
 describe('ArmadaClient', () => {
@@ -85,5 +85,16 @@ describe('ArmadaClient', () => {
         assert.ok(statusMap instanceof Map, 'should return a Map');
         assert.ok(statusMap.has(jobId), 'should have the requested job ID');
         assert.strictEqual(statusMap.get(jobId), 'RUNNING');
+    });
+
+    it('client connects successfully with forceNoTls set to true', async () => {
+        const tlsConfig: ResolvedConfig = {
+            armadaUrl: config.armadaUrl,
+            forceNoTls: true,
+            auth: { type: 'none' }
+        };
+        const insecureClient = new ArmadaClient(tlsConfig);
+        const result = await insecureClient.testConnection();
+        assert.strictEqual(result, true);
     });
 });
