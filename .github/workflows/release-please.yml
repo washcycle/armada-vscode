@@ -20,4 +20,15 @@ jobs:
         id: release
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.GH_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          # GH_RELEASE_TOKEN must be a PAT with contents:write and pull-requests:write permissions.
+          # GITHUB_TOKEN is intentionally not used here because releases created by GITHUB_TOKEN
+          # cannot trigger other workflows (e.g., the publish workflow).
+          token: ${{ secrets.GH_RELEASE_TOKEN }}
+
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag_name: ${{ needs.release-please.outputs.tag_name }}
+    secrets: inherit
