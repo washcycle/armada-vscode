@@ -10,6 +10,14 @@ import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue } from '../typ
  * port 443.  Passing `forceNoTls: true` always returns insecure credentials
  * regardless of the URL (useful for development / plain-text servers).
  */
+/**
+ * Strip any `http://` or `https://` scheme prefix from a URL so that the
+ * result can be used as a bare `host:port` gRPC target string.
+ */
+export function stripScheme(url: string): string {
+    return url.replace(/^https?:\/\//, '');
+}
+
 export function selectCredentials(url: string, forceNoTls?: boolean): grpc.ChannelCredentials {
     if (forceNoTls) {
         return grpc.credentials.createInsecure();
@@ -147,6 +155,7 @@ export class ArmadaClient {
         }
 
         const credentials = this.getCredentials(this.config.armadaUrl);
+        const armadaTarget = stripScheme(this.config.armadaUrl);
 
         // Set up proto include paths
         const protoRoot = path.join(__dirname, 'proto');
@@ -164,7 +173,7 @@ export class ArmadaClient {
         const submitPackageDefinition = protoLoader.loadSync(submitProtoPath, protoOptions);
         const submitProto = grpc.loadPackageDefinition(submitPackageDefinition) as any;
         this.submitClient = new submitProto.api.Submit(
-            this.config.armadaUrl,
+            armadaTarget,
             credentials
         );
 
@@ -173,7 +182,7 @@ export class ArmadaClient {
         const eventPackageDefinition = protoLoader.loadSync(eventProtoPath, protoOptions);
         const eventProto = grpc.loadPackageDefinition(eventPackageDefinition) as any;
         this.eventClient = new eventProto.api.Event(
-            this.config.armadaUrl,
+            armadaTarget,
             credentials
         );
 
@@ -182,7 +191,7 @@ export class ArmadaClient {
         const jobPackageDefinition = protoLoader.loadSync(jobProtoPath, protoOptions);
         const jobProto = grpc.loadPackageDefinition(jobPackageDefinition) as any;
         this.jobsClient = new jobProto.api.Jobs(
-            this.config.armadaUrl,
+            armadaTarget,
             credentials
         );
 
@@ -767,13 +776,38 @@ export class ArmadaClient {
      * Test connection to Armada server
      */
     async testConnection(): Promise<boolean> {
+        this.initializeClients();
         try {
-            this.initializeClients();
-            // Try to get a queue that likely doesn't exist - but should fail gracefully
             await this.getQueue('test-connection');
             return true;
-        } catch (error) {
-            // If we get a proper gRPC error, connection is working
+        } catch (error: any) {
+            const code: number | undefined = error?.code;
+            const msg: string = error?.message ?? '';
+
+            // gRPC status codes that indicate the transport is alive but the
+            // call was rejected at the application level (queue not found, etc.)
+            const APPLICATION_LEVEL_CODES = new Set([
+                2,  // UNKNOWN
+                5,  // NOT_FOUND
+                12, // UNIMPLEMENTED
+            ]);
+
+            if (code !== undefined && APPLICATION_LEVEL_CODES.has(code)) {
+                return true;
+            }
+
+            // TLS / transport keywords in error messages
+            const transportErrorPattern = /ssl|tls|handshake|certificate|transport|socket hang up/i;
+            if (transportErrorPattern.test(msg)) {
+                throw error;
+            }
+
+            // gRPC UNAVAILABLE (14) or INTERNAL (13) — transport-level issues
+            if (code === 14 || code === 13) {
+                throw error;
+            }
+
+            // Default: assume connection is working for any other error
             return true;
         }
     }
