@@ -35,6 +35,7 @@ export interface ArmadaConfig {
     contexts?: Record<string, ArmadaContext>;
     // Legacy format (direct config without contexts)
     armadaUrl?: string;
+    forceNoTls?: boolean; // When true, use insecure (plaintext) gRPC even if TLS is detected
     openIdConnect?: OpenIdConnect;
     execAuth?: ExecAuth;
 }
