@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { MockArmadaServer } from '../../mock/armadaServer';
-import { ArmadaClient } from '../../../grpc/armadaClient';
+import { ArmadaClient, selectCredentials } from '../../../grpc/armadaClient';
 import { ResolvedConfig } from '../../../types/config';
 
 describe('ArmadaClient', () => {
@@ -85,5 +85,32 @@ describe('ArmadaClient', () => {
         assert.ok(statusMap instanceof Map, 'should return a Map');
         assert.ok(statusMap.has(jobId), 'should have the requested job ID');
         assert.strictEqual(statusMap.get(jobId), 'RUNNING');
+    });
+
+    it('client connects successfully with forceNoTls set to true', async () => {
+        // Construct a URL that would normally cause TLS credentials to be selected.
+        const [host, port] = config.armadaUrl.split(':');
+        const tlsArmadaUrl = `https://${host}:${port}`;
+
+        // Without forceNoTls, connecting to an HTTPS-style URL against the mock
+        // (which speaks plaintext) should fail.
+        const secureConfig: ResolvedConfig = {
+            armadaUrl: tlsArmadaUrl,
+            auth: { type: 'none' }
+        };
+        const secureClient = new ArmadaClient(secureConfig);
+        await assert.rejects(async () => {
+            await secureClient.testConnection();
+        });
+
+        // With forceNoTls set, the same URL should connect successfully using insecure credentials.
+        const insecureConfig: ResolvedConfig = {
+            armadaUrl: tlsArmadaUrl,
+            forceNoTls: true,
+            auth: { type: 'none' }
+        };
+        const insecureClient = new ArmadaClient(insecureConfig);
+        const result = await insecureClient.testConnection();
+        assert.strictEqual(result, true);
     });
 });

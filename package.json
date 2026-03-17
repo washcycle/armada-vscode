@@ -9,7 +9,7 @@
   "name": "armada-vscode",
   "displayName": "Armada",
   "description": "VSCode extension for Armada - Kubernetes batch job scheduler",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "thefunktion",
   "engines": {
     "vscode": "^1.109.0"
@@ -283,8 +283,11 @@
     "esbuild": "^0.27.4",
     "eslint": "^9.39.2",
     "glob": "^13.0.3",
-    "mocha": "^10.3.0",
+    "mocha": "^11",
     "typescript": "^5.7.2"
+  },
+  "overrides": {
+    "serialize-javascript": ">=7.0.3"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",

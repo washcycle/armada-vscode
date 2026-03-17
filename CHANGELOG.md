@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.2...armada-vscode-v0.2.3) (2026-03-15)
+
+
+### Bug Fixes
+
+* patch serialize-javascript RCE (CVE-2024-11831) ([#37](https://github.com/washcycle/armada-vscode/issues/37)) ([55b06d3](https://github.com/washcycle/armada-vscode/commit/55b06d397e7d6e2da22a751cf5a16b2743147f71))
+* upgrade GitHub Actions to Node.js 22 runners ([#35](https://github.com/washcycle/armada-vscode/issues/35)) ([8ea730d](https://github.com/washcycle/armada-vscode/commit/8ea730d5aa151bc5bcb9134f9d5fef35b088fb20))
+
 ## [0.2.2](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.1...armada-vscode-v0.2.2) (2026-03-14)
 
 
