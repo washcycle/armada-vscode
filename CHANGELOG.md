@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.4](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.3...armada-vscode-v0.2.4) (2026-03-17)
+
+
+### Miscellaneous
+
+* add CLAUDE.md to enforce beads usage and PR conventions ([cb60318](https://github.com/washcycle/armada-vscode/commit/cb603180b0f976b3054960237419ad8afdcc0339))
+* archive enforce-conventional-pr-titles change ([d9219bf](https://github.com/washcycle/armada-vscode/commit/d9219bf9f8dc4917da23141f2d73d1fbb79cdbd1))
+* trigger release for [#39](https://github.com/washcycle/armada-vscode/issues/39) [#40](https://github.com/washcycle/armada-vscode/issues/40) [#41](https://github.com/washcycle/armada-vscode/issues/41) ([7bc2632](https://github.com/washcycle/armada-vscode/commit/7bc2632b4b592bcec22f366cd08a7d9b636df153))
+
 ## [0.2.3](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.2...armada-vscode-v0.2.3) (2026-03-15)
 
 
