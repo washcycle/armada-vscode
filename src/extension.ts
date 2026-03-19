@@ -20,6 +20,7 @@ import { createQueueCommand } from './commands/createQueue';
 import { cancelJobSetCommand } from './commands/cancelJobSet';
 import { reprioritizeJobCommand } from './commands/reprioritizeJob';
 import { JobDetailPanel } from './panels/jobDetailPanel';
+import { ConfigPanel } from './panels/configPanel';
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Armada extension is now active');
@@ -81,18 +82,51 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const updateStatusBar = () => {
         const config = configManager.getCurrentConfig();
-        if (config) {
-            statusBarItem.text = `$(server-process) Armada: ${config.currentContext || 'default'}`;
-            statusBarItem.tooltip = `Connected to ${config.armadaUrl}\nClick to switch context`;
-            statusBarItem.show();
-            vscode.commands.executeCommand('setContext', 'armada.configured', true);
-        } else {
+        if (!config) {
             statusBarItem.text = '$(warning) Armada: Not configured';
             statusBarItem.tooltip = 'Click to setup configuration';
+            statusBarItem.command = 'armada.setupConfig';
             statusBarItem.show();
             vscode.commands.executeCommand('setContext', 'armada.configured', false);
+            return;
         }
+
+        vscode.commands.executeCommand('setContext', 'armada.configured', true);
+        const ctx = config.currentContext || 'default';
+        const state = armadaClient?.connectionState ?? 'unknown';
+
+        switch (state) {
+            case 'connected':
+                statusBarItem.text = `$(check) Armada: ${ctx}`;
+                statusBarItem.tooltip = `Connected to ${config.armadaUrl}`;
+                statusBarItem.command = 'armada.switchContext';
+                break;
+            case 'error':
+                statusBarItem.text = `$(error) Armada: ${ctx}`;
+                statusBarItem.tooltip = `Cannot reach ${config.armadaUrl} · Click to diagnose`;
+                statusBarItem.command = 'armada.showConfig';
+                break;
+            case 'auth-error':
+                statusBarItem.text = `$(warning) Armada: ${ctx}`;
+                statusBarItem.tooltip = `Authentication failed · Click to diagnose`;
+                statusBarItem.command = 'armada.showConfig';
+                break;
+            default: // 'unknown'
+                statusBarItem.text = `$(server-process) Armada: ${ctx}`;
+                statusBarItem.tooltip = `${config.armadaUrl} · Click to switch context`;
+                statusBarItem.command = 'armada.switchContext';
+        }
+        statusBarItem.show();
     };
+
+    const wireClientCallbacks = (client: ArmadaClient) => {
+        client.onConnectionStateChange = () => updateStatusBar();
+    };
+
+    if (armadaClient) {
+        wireClientCallbacks(armadaClient);
+    }
+
     updateStatusBar();
 
     // Register commands
@@ -109,6 +143,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const config = await configManager.loadConfig();
             if (config) {
                 armadaClient = new ArmadaClient(config);
+                wireClientCallbacks(armadaClient);
                 jobTreeProvider.updateClient(armadaClient);
                 updateStatusBar();
             }
@@ -126,6 +161,7 @@ export async function activate(context: vscode.ExtensionContext) {
             // Only reinitialize if context actually changed or config was reloaded
             if (config && (previousContext !== newContext)) {
                 armadaClient = new ArmadaClient(config);
+                wireClientCallbacks(armadaClient);
                 jobTreeProvider.updateClient(armadaClient);
                 updateStatusBar();
             }
@@ -205,6 +241,13 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
+        vscode.commands.registerCommand('armada.showConfig', () => {
+            const config = configManager.getCurrentConfig();
+            ConfigPanel.show(config, armadaClient, configManager.getContexts());
+        })
+    );
+
+    context.subscriptions.push(
         vscode.commands.registerCommand('armada.viewJobDetails', (item) => {
             if (!armadaClient) {
                 vscode.window.showErrorMessage('Armada client not initialized. Please check your configuration.');
@@ -230,6 +273,7 @@ export async function activate(context: vscode.ExtensionContext) {
             const config = await configManager.loadConfig();
             if (config) {
                 armadaClient = new ArmadaClient(config);
+                wireClientCallbacks(armadaClient);
                 jobTreeProvider.updateClient(armadaClient);
                 updateStatusBar();
                 vscode.window.showInformationMessage('Armada configuration reloaded');

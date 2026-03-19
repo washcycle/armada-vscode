@@ -48,7 +48,8 @@
     "onCommand:armada.loadJobSet",
     "onCommand:armada.browseJobSets",
     "onCommand:armada.clearMonitoredJobSets",
-    "onCommand:armada.createQueue"
+    "onCommand:armada.createQueue",
+    "onCommand:armada.showConfig"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -132,6 +133,11 @@
         "command": "armada.viewJobDetails",
         "title": "Armada: View Job Details",
         "icon": "$(info)"
+      },
+      {
+        "command": "armada.showConfig",
+        "title": "Armada: Show Configuration",
+        "icon": "$(gear)"
       }
     ],
     "viewsContainers": {

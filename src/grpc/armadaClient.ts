@@ -2,7 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
 import { ResolvedConfig } from '../types/config';
-import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue } from '../types/armada';
+import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult } from '../types/armada';
 
 /**
  * Select gRPC channel credentials for a given endpoint URL.
@@ -39,8 +39,28 @@ export class ArmadaClient {
     private config: ResolvedConfig;
     private initialized: boolean = false;
 
+    connectionState: ConnectionState = 'unknown';
+    onConnectionStateChange: ((state: ConnectionState, detail?: string) => void) | undefined;
+
     constructor(config: ResolvedConfig) {
         this.config = config;
+    }
+
+    private updateConnectionState(state: ConnectionState, detail?: string): void {
+        this.connectionState = state;
+        if (this.onConnectionStateChange) {
+            this.onConnectionStateChange(state, detail);
+        }
+    }
+
+    private classifyGrpcError(error: any): void {
+        const code: number | undefined = error?.code;
+        if (code === 14 || code === 13) {
+            this.updateConnectionState('error', `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`);
+        } else if (code === 16 || code === 7) {
+            this.updateConnectionState('auth-error', 'Authentication failed. Check your credentials.');
+        }
+        // Application-level errors (5, 12, 2, etc.) do not change state
     }
 
     /**
@@ -244,10 +264,12 @@ export class ArmadaClient {
             this.submitClient.SubmitJobs(request, (error: any, response: any) => {
                 if (error) {
                     console.error('[Armada] Submit error:', error);
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to submit jobs: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 console.log('[Armada] Submit successful:', response);
                 resolve({
                     jobIds: response.job_response_items || []
@@ -270,10 +292,12 @@ export class ArmadaClient {
 
             this.submitClient.CancelJobs(request, (error: any, response: any) => {
                 if (error) {
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to cancel job: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 resolve();
             });
         });
@@ -294,9 +318,11 @@ export class ArmadaClient {
 
             this.submitClient.ReprioritizeJobs(request, (error: any, response: any) => {
                 if (error) {
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to reprioritize jobs: ${error.message}`));
                     return;
                 }
+                this.updateConnectionState('connected');
                 // reprioritization_results maps jobId -> error string (empty = success)
                 const results = new Map<string, string>();
                 if (response?.reprioritization_results) {
@@ -322,9 +348,11 @@ export class ArmadaClient {
 
             this.submitClient.CancelJobSet(request, (error: any, _response: any) => {
                 if (error) {
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to cancel job set: ${error.message}`));
                     return;
                 }
+                this.updateConnectionState('connected');
                 resolve();
             });
         });
@@ -342,10 +370,12 @@ export class ArmadaClient {
 
             this.submitClient.GetQueue(request, (error: any, response: any) => {
                 if (error) {
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to get queue: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 resolve(response);
             });
         });
@@ -389,10 +419,12 @@ export class ArmadaClient {
         return new Promise((resolve, reject) => {
             this.submitClient.CreateQueue(queue, (error: any, response: any) => {
                 if (error) {
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to create queue: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 console.log('[Armada] Queue created successfully:', queue.name);
                 resolve();
             });
@@ -611,10 +643,12 @@ export class ArmadaClient {
             this.jobsClient.GetJobStatus(request, (error: any, response: any) => {
                 if (error) {
                     console.error('[Armada] GetJobStatus error:', error);
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to get job status: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 console.log('[Armada] GetJobStatus response:', response);
 
                 // Convert the response map to a JavaScript Map
@@ -650,10 +684,12 @@ export class ArmadaClient {
             this.jobsClient.GetJobDetails(request, (error: any, response: any) => {
                 if (error) {
                     console.error('[Armada] GetJobDetails error:', error);
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to get job details: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 console.log('[Armada] GetJobDetails response:', response);
 
                 // Convert the response map to a JavaScript Map
@@ -682,10 +718,12 @@ export class ArmadaClient {
             this.jobsClient.GetJobErrors(request, (error: any, response: any) => {
                 if (error) {
                     console.error('[Armada] GetJobErrors error:', error);
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to get job errors: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 console.log('[Armada] GetJobErrors response:', response);
 
                 // Convert the response map to a JavaScript Map
@@ -712,10 +750,12 @@ export class ArmadaClient {
             this.jobsClient.GetActiveQueues(request, (error: any, response: any) => {
                 if (error) {
                     console.error('[Armada] GetActiveQueues error:', error);
+                    this.classifyGrpcError(error);
                     reject(new Error(`Failed to get active queues: ${error.message}`));
                     return;
                 }
 
+                this.updateConnectionState('connected');
                 console.log('[Armada] GetActiveQueues response:', response);
 
                 // Convert the response to a Map of pool -> queue names
@@ -824,42 +864,46 @@ export class ArmadaClient {
      */
 
     /**
-     * Test connection to Armada server
+     * Probe the Armada server and return a structured result.
+     * Never throws — callers always get a ConnectionTestResult.
      */
-    async testConnection(): Promise<boolean> {
+    async testConnection(): Promise<ConnectionTestResult> {
         this.initializeClients();
-        try {
-            await this.getQueue('test-connection');
-            return true;
-        } catch (error: any) {
-            const code: number | undefined = error?.code;
-            const msg: string = error?.message ?? '';
+        return new Promise((resolve) => {
+            this.jobsClient.GetActiveQueues({}, (error: any, response: any) => {
+                if (error) {
+                    const code: number | undefined = error?.code;
+                    this.classifyGrpcError(error);
 
-            // gRPC status codes that indicate the transport is alive but the
-            // call was rejected at the application level (queue not found, etc.)
-            const APPLICATION_LEVEL_CODES = new Set([
-                2,  // UNKNOWN
-                5,  // NOT_FOUND
-                12, // UNIMPLEMENTED
-            ]);
+                    const messageMap: Record<number, string> = {
+                        13: `Internal server error. The server at ${this.config.armadaUrl} returned an unexpected error.`,
+                        14: `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`,
+                        16: 'Authentication failed. Check your credentials.',
+                        7:  'Permission denied. Check your credentials and access rights.',
+                    };
 
-            if (code !== undefined && APPLICATION_LEVEL_CODES.has(code)) {
-                return true;
-            }
+                    const message = code !== undefined && messageMap[code]
+                        ? messageMap[code]
+                        : `Unexpected error (code ${code ?? '?'}): ${error.message}`;
 
-            // TLS / transport keywords in error messages
-            const transportErrorPattern = /ssl|tls|handshake|certificate|transport|socket hang up/i;
-            if (transportErrorPattern.test(msg)) {
-                throw error;
-            }
+                    // Application-level errors mean transport is alive
+                    const APPLICATION_LEVEL_CODES = new Set([2, 5, 12]);
+                    if (code !== undefined && APPLICATION_LEVEL_CODES.has(code)) {
+                        this.updateConnectionState('connected');
+                        resolve({ ok: true, detail: 'Server reachable (no active queues data available)' });
+                        return;
+                    }
 
-            // gRPC UNAVAILABLE (14) or INTERNAL (13) — transport-level issues
-            if (code === 14 || code === 13) {
-                throw error;
-            }
+                    resolve({ ok: false, code, message });
+                    return;
+                }
 
-            // Default: assume connection is working for any other error
-            return true;
-        }
+                this.updateConnectionState('connected');
+                const totalQueues = Array.from(
+                    Object.values(response.active_queues_by_pool ?? {})
+                ).reduce((sum: number, pool: any) => sum + (pool?.queues?.length ?? 0), 0);
+                resolve({ ok: true, detail: `${totalQueues} active queue${totalQueues !== 1 ? 's' : ''} found` });
+            });
+        });
     }
 }
