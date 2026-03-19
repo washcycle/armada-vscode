@@ -15,4 +15,4 @@
 
 ## 4. Verify
 
-- [ ] 4.1 Push to a branch and confirm CI runs with no Node.js 20 deprecation annotations
+- [x] 4.1 Push to a branch and confirm CI runs with no Node.js 20 deprecation annotations
