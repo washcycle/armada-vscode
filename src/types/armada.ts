@@ -91,6 +91,19 @@ export interface Queue {
 }
 
 /**
+ * Connection state and diagnostics
+ */
+
+export type ConnectionState = 'unknown' | 'connected' | 'error' | 'auth-error';
+
+export interface ConnectionTestResult {
+    ok: boolean;
+    detail?: string;   // present when ok === true
+    code?: number;     // gRPC status code, present when ok === false
+    message?: string;  // human-readable error, present when ok === false
+}
+
+/**
  * gRPC response types
  */
 
