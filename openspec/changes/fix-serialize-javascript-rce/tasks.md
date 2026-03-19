@@ -10,5 +10,5 @@
 
 ## 3. Commit and push
 
-- [ ] 3.1 Commit `package.json` and `package-lock.json` with message `fix: upgrade mocha to v11 to patch serialize-javascript RCE (CVE-2024-11831)`
-- [ ] 3.2 Push and confirm Dependabot alert #18 is resolved
+- [x] 3.1 Commit `package.json` and `package-lock.json` with message `fix: upgrade mocha to v11 to patch serialize-javascript RCE (CVE-2024-11831)`
+- [x] 3.2 Push and confirm Dependabot alert #18 is resolved
