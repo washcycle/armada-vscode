@@ -21,6 +21,8 @@ export class ConfigPanel {
 
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
+    private _config: ResolvedConfig | null;
+    private _client: ArmadaClient | undefined;
 
     static show(
         config: ResolvedConfig | null,
@@ -40,6 +42,8 @@ export class ConfigPanel {
         client: ArmadaClient | undefined,
         contexts: string[]
     ) {
+        this._config = config;
+        this._client = client;
 
         this.panel = vscode.window.createWebviewPanel(
             'armadaConfig',
@@ -62,7 +66,7 @@ export class ConfigPanel {
         this.panel.webview.onDidReceiveMessage(
             async (message) => {
                 if (message.command === 'testConnection') {
-                    if (!client) {
+                    if (!this._client) {
                         this.panel.webview.postMessage({
                             command: 'testResult',
                             ok: false,
@@ -70,7 +74,7 @@ export class ConfigPanel {
                         });
                         return;
                     }
-                    const result = await client.testConnection();
+                    const result = await this._client.testConnection();
                     this.panel.webview.postMessage({
                         command: 'testResult',
                         ok: result.ok,
@@ -80,7 +84,7 @@ export class ConfigPanel {
                 } else if (message.command === 'switchContext') {
                     vscode.commands.executeCommand('armada.switchContext');
                 } else if (message.command === 'revealSecret') {
-                    const value = this.resolveSecretValue(config, message.field);
+                    const value = this.resolveSecretValue(this._config, message.field);
                     this.panel.webview.postMessage({
                         command: 'secretRevealed',
                         field: message.field,
@@ -101,7 +105,9 @@ export class ConfigPanel {
         return creds[field] !== undefined ? String(creds[field]) : undefined;
     }
 
-    update(config: ResolvedConfig | null, _client: ArmadaClient | undefined, contexts: string[]): void {
+    update(config: ResolvedConfig | null, client: ArmadaClient | undefined, contexts: string[]): void {
+        this._config = config;
+        this._client = client;
         this.panel.webview.html = this.renderHtml(config, contexts);
     }
 
