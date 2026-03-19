@@ -24,6 +24,7 @@ ARMADA_CRS_CI := \
 	$(ARMADA_CRS_DIR)/executor.yaml
 PRIORITY_CLASS := $(MANIFEST_DIR)/priority-class.yaml
 OPERATOR_RBAC_PATCH := $(MANIFEST_DIR)/operator-rbac-patch.yaml
+BINOCULARS_RBAC := $(MANIFEST_DIR)/binoculars-rbac.yaml
 PULSAR_VALUES := $(MANIFEST_DIR)/pulsar.values.yaml
 REDIS_VALUES := $(MANIFEST_DIR)/redis.values.yaml
 POSTGRES_VALUES := $(MANIFEST_DIR)/postgres.values.yaml
@@ -172,8 +173,9 @@ wait-for-operator-webhook: ## Wait for the operator webhook to be ready before a
 		sleep 2; \
 	done
 
-patch-operator-rbac: ## Patch the operator ClusterRole to allow binoculars deployment
+patch-operator-rbac: ## Patch the operator ClusterRole and grant binoculars pod log access
 	kubectl --context $(KIND_CONTEXT) apply -f $(OPERATOR_RBAC_PATCH)
+	kubectl --context $(KIND_CONTEXT) apply -f $(BINOCULARS_RBAC)
 
 uninstall-armada-operator: ## Remove the Armada Operator chart
 	helm uninstall armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
