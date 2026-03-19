@@ -130,7 +130,7 @@ uninstall-pulsar:
 	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/pulsar-standalone.yaml --ignore-not-found
 
 install-redis:
-	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/redis-simple.yaml --ignore-not-found 2>/dev/null || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/redis-simple.yaml --ignore-not-found
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-redis-ci:
