@@ -1,4 +1,4 @@
-.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces create-test-queue create-pulsar-service
+.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces wait-for-armada-server create-test-queue create-pulsar-service
 
 KIND_CLUSTER_NAME ?= armada
 KIND_CONTEXT := kind-$(KIND_CLUSTER_NAME)
@@ -33,7 +33,7 @@ PULSAR_VALUES_CI := $(MANIFEST_DIR)/pulsar.values.ci.yaml
 REDIS_VALUES_CI := $(MANIFEST_DIR)/redis.values.ci.yaml
 POSTGRES_VALUES_CI := $(MANIFEST_DIR)/postgres.values.ci.yaml
 
-up: kind-create helm-repos install-cert-manager install-armada-deps create-pulsar-service install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Stand up a kind cluster with Armada via Helm + Operator
+up: kind-create helm-repos install-cert-manager install-armada-deps create-pulsar-service install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs wait-for-armada-server create-test-queue ## Stand up a kind cluster with Armada via Helm + Operator
 
 up-ci: ## Minimal CI setup with reduced resources
 	@set -e; \
@@ -130,7 +130,7 @@ uninstall-pulsar:
 	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/pulsar-standalone.yaml --ignore-not-found
 
 install-redis:
-	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/redis-simple.yaml --ignore-not-found 2>/dev/null || true
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/redis-simple.yaml --ignore-not-found
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-redis-ci:
@@ -204,6 +204,9 @@ delete-armada-crs: ## Delete the demo Armada CRs
 create-pulsar-service: ## Create a 'pulsar' ClusterIP service in the data namespace pointing to pulsar-proxy
 	@echo "Creating pulsar service alias in $(DATA_NAMESPACE) namespace..."
 	kubectl --context $(KIND_CONTEXT) apply -n $(DATA_NAMESPACE) -f $(MANIFEST_DIR)/pulsar-service.yaml
+
+wait-for-armada-server: ## Wait for armada-server deployment to be available
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=330s -n $(ARMADA_NAMESPACE) deployment/armada-server
 
 create-test-queue: ## Create a test queue for integration testing
 	@echo "Creating test queue..."
