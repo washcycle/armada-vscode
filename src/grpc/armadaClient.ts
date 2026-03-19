@@ -889,7 +889,6 @@ export class ArmadaClient {
                     // Application-level errors mean transport is alive
                     const APPLICATION_LEVEL_CODES = new Set([2, 5, 12]);
                     if (code !== undefined && APPLICATION_LEVEL_CODES.has(code)) {
-                        this.updateConnectionState('connected');
                         resolve({ ok: true, detail: 'Server reachable (no active queues data available)' });
                         return;
                     }

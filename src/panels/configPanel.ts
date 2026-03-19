@@ -228,11 +228,12 @@ export class ConfigPanel {
     }
 
     private wrapHtml(body: string): string {
+        const nonce = Buffer.from(Math.random().toString(), 'utf-8').toString('base64');
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
   body {
     font-family: var(--vscode-font-family);
