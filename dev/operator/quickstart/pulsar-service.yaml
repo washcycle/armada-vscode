@@ -1,0 +1,17 @@
+# Service alias so Armada components can reach Pulsar via the expected
+# hostname 'pulsar.data.svc.cluster.local:6650'. The full Pulsar Helm chart
+# exposes the broker via 'pulsar-proxy', so this ClusterIP service bridges
+# the naming gap.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulsar
+  namespace: data
+spec:
+  selector:
+    app: pulsar
+    component: proxy
+  ports:
+  - name: pulsar
+    port: 6650
+    targetPort: 6650
