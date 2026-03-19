@@ -117,6 +117,21 @@
         "command": "armada.createQueue",
         "title": "Armada: Create Queue",
         "icon": "$(add)"
+      },
+      {
+        "command": "armada.cancelJobSet",
+        "title": "Armada: Cancel Job Set",
+        "icon": "$(circle-slash)"
+      },
+      {
+        "command": "armada.reprioritizeJob",
+        "title": "Armada: Reprioritize Job",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "armada.viewJobDetails",
+        "title": "Armada: View Job Details",
+        "icon": "$(info)"
       }
     ],
     "viewsContainers": {
@@ -198,9 +213,29 @@
           "group": "armada@1"
         },
         {
+          "command": "armada.viewJobDetails",
+          "when": "view == armadaJobsView && viewItem == job",
+          "group": "inline"
+        },
+        {
+          "command": "armada.viewJobDetails",
+          "when": "view == armadaJobsView && viewItem == job",
+          "group": "armada@1"
+        },
+        {
           "command": "armada.cancelJob",
           "when": "view == armadaJobsView && viewItem == job",
           "group": "armada@2"
+        },
+        {
+          "command": "armada.reprioritizeJob",
+          "when": "view == armadaJobsView && viewItem == job",
+          "group": "armada@3"
+        },
+        {
+          "command": "armada.cancelJobSet",
+          "when": "view == armadaJobsView && viewItem == jobset",
+          "group": "armada@1"
         }
       ],
       "editor/title": [

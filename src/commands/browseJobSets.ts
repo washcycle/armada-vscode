@@ -3,10 +3,14 @@ import { ArmadaClient } from '../grpc/armadaClient';
 import { JobTreeProvider } from '../providers/jobTreeProvider';
 import { LookoutClient } from '../api/lookoutClient';
 import { JobState } from '../types/armada';
+import { ResolvedConfig } from '../types/config';
+
+const LOOKOUT_LOCALHOST_DEFAULT = 'http://localhost:30000';
 
 export async function browseJobSetsCommand(
     client: ArmadaClient | undefined,
-    jobTreeProvider: JobTreeProvider
+    jobTreeProvider: JobTreeProvider,
+    config?: ResolvedConfig
 ): Promise<void> {
     if (!client) {
         vscode.window.showErrorMessage('Armada client not initialized. Please check your configuration.');
@@ -14,8 +18,12 @@ export async function browseJobSetsCommand(
     }
 
     try {
-        // TODO: Get Lookout URL from config (for now, use localhost:30000)
-        const lookoutUrl = 'http://localhost:30000';
+        const lookoutUrl = config?.lookoutUrl ?? LOOKOUT_LOCALHOST_DEFAULT;
+        if (!config?.lookoutUrl) {
+            console.warn('[Armada] lookoutUrl not configured, falling back to localhost:30000. Add lookoutUrl to your armadactl.yaml context.');
+        } else if (lookoutUrl.startsWith('http://') && !lookoutUrl.includes('localhost') && !lookoutUrl.includes('127.0.0.1')) {
+            console.warn('[Armada] lookoutUrl uses http:// without TLS. Consider using https:// for non-local clusters.');
+        }
         const lookoutClient = new LookoutClient({ lookoutUrl });
 
         // Step 1: Select a queue

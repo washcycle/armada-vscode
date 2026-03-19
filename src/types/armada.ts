@@ -51,14 +51,19 @@ export enum JobState {
     PREEMPTED = 'PREEMPTED'
 }
 
+export type FailureCategory = 'OOM' | 'Evicted' | 'ImagePull' | 'Preempted' | 'Rejected' | 'UserError';
+
 export interface JobInfo {
     jobId: string;
     jobSetId: string;
     queue: string;
     state: JobState;
     created?: Date;
+    stateEnteredAt?: Date;
     priority?: number;
     namespace?: string;
+    failureReason?: string;
+    failureCategory?: FailureCategory;
 }
 
 export interface JobSetInfo {

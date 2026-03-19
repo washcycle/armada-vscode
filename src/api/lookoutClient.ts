@@ -2,7 +2,8 @@ import * as https from 'https';
 import * as http from 'http';
 
 export interface LookoutConfig {
-    lookoutUrl: string; // e.g., "http://localhost:30000"
+    lookoutUrl: string; // e.g., "https://lookout.armada.example.com"
+    authHeader?: string; // Optional Bearer token or other auth header value
 }
 
 export interface LookoutJob {
@@ -50,9 +51,11 @@ export interface LookoutJobsResponse {
 
 export class LookoutClient {
     private lookoutUrl: string;
+    private authHeader?: string;
 
     constructor(config: LookoutConfig) {
         this.lookoutUrl = config.lookoutUrl.replace(/\/$/, ''); // Remove trailing slash
+        this.authHeader = config.authHeader;
     }
 
     /**
@@ -158,14 +161,19 @@ export class LookoutClient {
             const isHttps = urlObj.protocol === 'https:';
             const client = isHttps ? https : http;
 
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+            };
+            if (this.authHeader) {
+                headers['Authorization'] = this.authHeader;
+            }
+
             const options = {
                 hostname: urlObj.hostname,
                 port: urlObj.port || (isHttps ? 443 : 80),
                 path: urlObj.pathname + urlObj.search,
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers
             };
 
             const req = client.request(options, (res) => {

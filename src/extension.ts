@@ -17,6 +17,9 @@ import { viewJobLogsCommand } from './commands/viewJobLogs';
 import { browseJobSetsCommand } from './commands/browseJobSets';
 import { clearMonitoredJobSetsCommand } from './commands/clearMonitoredJobSets';
 import { createQueueCommand } from './commands/createQueue';
+import { cancelJobSetCommand } from './commands/cancelJobSet';
+import { reprioritizeJobCommand } from './commands/reprioritizeJob';
+import { JobDetailPanel } from './panels/jobDetailPanel';
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Armada extension is now active');
@@ -173,7 +176,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('armada.browseJobSets', () =>
-            browseJobSetsCommand(armadaClient, jobTreeProvider)
+            browseJobSetsCommand(armadaClient, jobTreeProvider, configManager.getCurrentConfig() ?? undefined)
         )
     );
 
@@ -187,6 +190,32 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('armada.createQueue', () =>
             createQueueCommand(armadaClient)
         )
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('armada.cancelJobSet', (item) =>
+            cancelJobSetCommand(armadaClient, item)
+        )
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('armada.reprioritizeJob', (item) =>
+            reprioritizeJobCommand(armadaClient, item)
+        )
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('armada.viewJobDetails', (item) => {
+            if (!armadaClient) {
+                vscode.window.showErrorMessage('Armada client not initialized. Please check your configuration.');
+                return;
+            }
+            if (!item?.jobInfo) {
+                vscode.window.showErrorMessage('Please select a job from the tree view.');
+                return;
+            }
+            JobDetailPanel.show(item.jobInfo, armadaClient);
+        })
     );
 
     // Watch config file for changes

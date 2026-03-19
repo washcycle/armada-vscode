@@ -72,6 +72,7 @@ export class ConfigManager {
                 armadaUrl: context.armadaUrl,
                 binocularsUrl: context.binocularsUrl,
                 binocularsUrlPattern: context.binocularsUrlPattern,
+                lookoutUrl: context.lookoutUrl,
                 forceNoTls: context.forceNoTls,
                 currentContext: contextName,
                 auth: this.extractAuth(context)

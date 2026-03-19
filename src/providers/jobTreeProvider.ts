@@ -111,11 +111,18 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
     /**
      * Update job state
      */
-    updateJobState(jobId: string, state: JobState): void {
+    updateJobState(jobId: string, state: JobState, failureReason?: string, failureCategory?: import('../types/armada').FailureCategory): void {
         for (const jobSet of this.jobs.values()) {
             const job = jobSet.jobs.find(j => j.jobInfo.jobId === jobId);
             if (job) {
                 job.jobInfo.state = state;
+                job.jobInfo.stateEnteredAt = new Date();
+                if (failureReason !== undefined) {
+                    job.jobInfo.failureReason = failureReason;
+                }
+                if (failureCategory !== undefined) {
+                    job.jobInfo.failureCategory = failureCategory;
+                }
                 job.updateDisplay();
                 this.refresh();
                 return;
@@ -439,6 +446,8 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
 
         const eventType = event.event.type;
         let state: JobState;
+        let failureReason: string | undefined;
+        let failureCategory: import('../types/armada').FailureCategory | undefined;
 
         switch (eventType) {
             case 'submitted':
@@ -455,14 +464,19 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
             case 'succeeded':
                 state = JobState.SUCCEEDED;
                 break;
-            case 'failed':
+            case 'failed': {
                 state = JobState.FAILED;
+                const failedEvent = event.event;
+                ({ failureReason, failureCategory } = extractFailureInfo(failedEvent));
                 break;
+            }
             case 'cancelled':
                 state = JobState.CANCELLED;
                 break;
             case 'preempted':
                 state = JobState.PREEMPTED;
+                failureReason = 'Preempted by higher-priority job';
+                failureCategory = 'Preempted';
                 break;
             default:
                 console.log('[Armada] Unknown event type:', eventType);
@@ -470,8 +484,56 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
         }
 
         console.log('[Armada] Updating job', event.jobId, 'to state', state);
-        this.updateJobState(event.jobId, state);
+        this.updateJobState(event.jobId, state, failureReason, failureCategory);
     }
+}
+
+function extractFailureInfo(failedEvent: any): { failureReason: string; failureCategory: import('../types/armada').FailureCategory } {
+    const cause = failedEvent.cause ?? '';
+    const reason = failedEvent.reason ?? '';
+    const containerStatuses: any[] = failedEvent.container_statuses ?? failedEvent.containerStatuses ?? [];
+
+    // Check container statuses for OOM, image pull, etc.
+    for (const container of containerStatuses) {
+        const containerReason = container.reason ?? '';
+        if (containerReason === 'OomKilled' || containerReason.includes('OOM')) {
+            return { failureReason: 'OOM killed', failureCategory: 'OOM' };
+        }
+        if (containerReason === 'ErrImagePull' || containerReason === 'ImagePullBackOff') {
+            return { failureReason: `Image pull failed: ${container.message ?? containerReason}`, failureCategory: 'ImagePull' };
+        }
+        if (containerReason === 'Evicted') {
+            return { failureReason: 'Evicted from node', failureCategory: 'Evicted' };
+        }
+    }
+
+    // Check cause enum
+    if (cause === 'OOM' || reason.toLowerCase().includes('oomkilled')) {
+        return { failureReason: 'OOM killed', failureCategory: 'OOM' };
+    }
+    if (cause === 'Evicted' || reason.toLowerCase().includes('evict')) {
+        return { failureReason: 'Evicted from node', failureCategory: 'Evicted' };
+    }
+    if (cause === 'Rejected') {
+        return { failureReason: reason || 'Job rejected by scheduler', failureCategory: 'Rejected' };
+    }
+
+    const message = reason || 'Non-zero exit code';
+    return { failureReason: message, failureCategory: 'UserError' };
+}
+
+function formatElapsed(since: Date): string {
+    const seconds = Math.floor((Date.now() - since.getTime()) / 1000);
+    if (seconds < 60) {
+        return `${seconds}s`;
+    }
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) {
+        return `${minutes}m`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 }
 
 class JobSetItem extends vscode.TreeItem {
@@ -502,7 +564,13 @@ class JobItem extends vscode.TreeItem {
 
     updateDisplay(): void {
         this.iconPath = this.getIconForState(this.jobInfo.state);
-        this.description = this.jobInfo.state;
+        const elapsed = this.jobInfo.stateEnteredAt ? formatElapsed(this.jobInfo.stateEnteredAt) : '';
+        const stateLabel = elapsed ? `${this.jobInfo.state}  ${elapsed}` : this.jobInfo.state;
+        if (this.jobInfo.failureReason && (this.jobInfo.state === JobState.FAILED || this.jobInfo.state === JobState.PREEMPTED)) {
+            this.description = `${stateLabel}  — ${this.jobInfo.failureReason}`;
+        } else {
+            this.description = stateLabel;
+        }
         this.tooltip = this.getTooltip();
     }
 
