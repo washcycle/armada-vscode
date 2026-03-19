@@ -1,12 +1,12 @@
 ## 1. Upgrade mocha
 
-- [ ] 1.1 In `package.json`, change `"mocha": "^10.3.0"` → `"mocha": "^11"` in `devDependencies`
-- [ ] 1.2 Run `npm install` to update `package-lock.json`
-- [ ] 1.3 Verify `npm ls serialize-javascript` shows only versions ≥7.0.3
+- [x] 1.1 In `package.json`, change `"mocha": "^10.3.0"` → `"mocha": "^11"` in `devDependencies`
+- [x] 1.2 Run `npm install` to update `package-lock.json`
+- [x] 1.3 Verify `npm ls serialize-javascript` shows only versions ≥7.0.3
 
 ## 2. Verify tests pass
 
-- [ ] 2.1 Run `npm run test:unit` and confirm all tests pass
+- [x] 2.1 Run `npm run test:unit` and confirm all tests pass
 
 ## 3. Commit and push
 
