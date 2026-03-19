@@ -10,10 +10,10 @@ export async function run(): Promise<void> {
         timeout: 60000 // 60 seconds for integration tests
     });
 
-    const testsRoot = path.resolve(__dirname, '..');
+    const testsRoot = path.resolve(__dirname);
 
     try {
-        const files = await glob('**/**.test.js', { cwd: testsRoot });
+        const files = await glob('**/*.test.js', { cwd: testsRoot });
 
         // Add files to the test suite
         files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
