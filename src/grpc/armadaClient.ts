@@ -280,6 +280,57 @@ export class ArmadaClient {
     }
 
     /**
+     * Reprioritize one or more jobs
+     */
+    async reprioritizeJobs(queue: string, jobSetId: string, jobIds: string[], newPriority: number): Promise<Map<string, string>> {
+        this.initializeClients();
+        return new Promise((resolve, reject) => {
+            const request = {
+                queue: queue,
+                job_set_id: jobSetId,
+                job_ids: jobIds,
+                new_priority: newPriority
+            };
+
+            this.submitClient.ReprioritizeJobs(request, (error: any, response: any) => {
+                if (error) {
+                    reject(new Error(`Failed to reprioritize jobs: ${error.message}`));
+                    return;
+                }
+                // reprioritization_results maps jobId -> error string (empty = success)
+                const results = new Map<string, string>();
+                if (response?.reprioritization_results) {
+                    for (const [jobId, err] of Object.entries(response.reprioritization_results)) {
+                        results.set(jobId, err as string);
+                    }
+                }
+                resolve(results);
+            });
+        });
+    }
+
+    /**
+     * Cancel all jobs in a job set
+     */
+    async cancelJobSet(queue: string, jobSetId: string): Promise<void> {
+        this.initializeClients();
+        return new Promise((resolve, reject) => {
+            const request = {
+                queue: queue,
+                job_set_id: jobSetId
+            };
+
+            this.submitClient.CancelJobSet(request, (error: any, _response: any) => {
+                if (error) {
+                    reject(new Error(`Failed to cancel job set: ${error.message}`));
+                    return;
+                }
+                resolve();
+            });
+        });
+    }
+
+    /**
      * Get queue information
      */
     async getQueue(queueName: string): Promise<any> {
