@@ -27,21 +27,19 @@ export class ConfigPanel {
 
     static show(
         config: ResolvedConfig | null,
-        client: ArmadaClient | undefined,
-        contexts: string[]
+        client: ArmadaClient | undefined
     ): void {
         if (ConfigPanel.instance) {
             ConfigPanel.instance.panel.reveal();
-            ConfigPanel.instance.update(config, client, contexts);
+            ConfigPanel.instance.update(config, client);
             return;
         }
-        new ConfigPanel(config, client, contexts);
+        new ConfigPanel(config, client);
     }
 
     private constructor(
         config: ResolvedConfig | null,
-        client: ArmadaClient | undefined,
-        contexts: string[]
+        client: ArmadaClient | undefined
     ) {
         this._config = config;
         this._client = client;
@@ -82,8 +80,6 @@ export class ConfigPanel {
                         detail: result.detail,
                         message: result.message
                     });
-                } else if (message.command === 'switchContext') {
-                    vscode.commands.executeCommand('armada.switchContext', message.context);
                 } else if (message.command === 'revealSecret') {
                     const value = this.resolveSecretValue(this._config, message.field);
                     this.panel.webview.postMessage({
@@ -97,7 +93,7 @@ export class ConfigPanel {
             this.disposables
         );
 
-        this.update(config, client, contexts);
+        this.update(config, client);
     }
 
     private resolveSecretValue(config: ResolvedConfig | null, field: string): string | undefined {
@@ -106,13 +102,13 @@ export class ConfigPanel {
         return creds[field] !== undefined ? String(creds[field]) : undefined;
     }
 
-    update(config: ResolvedConfig | null, client: ArmadaClient | undefined, contexts: string[]): void {
+    update(config: ResolvedConfig | null, client: ArmadaClient | undefined): void {
         this._config = config;
         this._client = client;
-        this.panel.webview.html = this.renderHtml(config, contexts);
+        this.panel.webview.html = this.renderHtml(config);
     }
 
-    private renderHtml(config: ResolvedConfig | null, contexts: string[]): string {
+    private renderHtml(config: ResolvedConfig | null): string {
         if (!config) {
             return this.wrapHtml(`
                 <div class="section">
@@ -124,24 +120,13 @@ export class ConfigPanel {
 
         const ctx = config.currentContext || 'default';
 
-        const contextDropdown = contexts.length > 1 ? `
-            <div class="row">
-                <span class="label">Context</span>
-                <span class="value">
-                    <select id="ctxSelect">
-                        ${contexts.map(c => `<option value="${esc(c)}"${c === ctx ? ' selected' : ''}>${esc(c)}</option>`).join('')}
-                    </select>
-                </span>
-            </div>` : `
-            <div class="row">
-                <span class="label">Context</span>
-                <span class="value">${esc(ctx)}</span>
-            </div>`;
-
         const tls = config.forceNoTls ? 'Disabled (forceNoTls)' : 'Enabled (auto-detect)';
 
         const connectionRows = `
-            ${contextDropdown}
+            <div class="row">
+                <span class="label">Context</span>
+                <span class="value">${esc(ctx)}</span>
+            </div>
             <div class="row">
                 <span class="label">Server URL</span>
                 <span class="value mono">${esc(config.armadaUrl)}</span>
@@ -261,12 +246,6 @@ export class ConfigPanel {
   .muted { color: var(--vscode-descriptionForeground); }
   .masked { letter-spacing: 0.1em; }
   .hidden { display: none; }
-  select {
-    background: var(--vscode-dropdown-background);
-    color: var(--vscode-dropdown-foreground);
-    border: 1px solid var(--vscode-dropdown-border);
-    padding: 2px 4px;
-  }
   button {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
@@ -306,13 +285,6 @@ ${body}
     result.className = 'hidden';
     vscode.postMessage({ command: 'testConnection' });
   });
-
-  const ctxSelect = document.getElementById('ctxSelect');
-  if (ctxSelect) {
-    ctxSelect.addEventListener('change', () => {
-      vscode.postMessage({ command: 'switchContext', context: ctxSelect.value });
-    });
-  }
 
   document.querySelectorAll('.inline-btn[data-key]').forEach(btn => {
     btn.addEventListener('click', () => {
