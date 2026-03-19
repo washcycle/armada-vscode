@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.3.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.4...armada-vscode-v0.3.0) (2026-03-19)
+
+
+### Features
+
+* implement P1 features (job detail panel, failure reasons, cancel job set, reprioritize, time-in-state, fix Lookout URL) ([#52](https://github.com/washcycle/armada-vscode/issues/52)) ([6ce95c7](https://github.com/washcycle/armada-vscode/commit/6ce95c776193f604d122bee46345202ef4b1d381))
+
+
+### Bug Fixes
+
+* remove duplicate on:release trigger from publish workflow ([0686f0e](https://github.com/washcycle/armada-vscode/commit/0686f0eaf7429bd3d6af6da40dd31668e5f9616e))
+* **test:** scope integration test glob to suite/ directory ([badedce](https://github.com/washcycle/armada-vscode/commit/badedce45750b9d13cfb0bb492bab6a7f0188325))
+* **test:** scope integration test glob to suite/ directory ([#49](https://github.com/washcycle/armada-vscode/issues/49)) ([0f1f08b](https://github.com/washcycle/armada-vscode/commit/0f1f08bf8ca50a43d0beab14b1ef8bcf851133f6))
+
+
+### Miscellaneous
+
+* **ci:** auto-request Copilot review on pull requests ([#50](https://github.com/washcycle/armada-vscode/issues/50)) ([2b81620](https://github.com/washcycle/armada-vscode/commit/2b8162083e80f1234322cedc2355d33fcc9b909f))
+* **deps-dev:** bump @types/node from 25.3.0 to 25.5.0 ([#47](https://github.com/washcycle/armada-vscode/issues/47)) ([0b3adee](https://github.com/washcycle/armada-vscode/commit/0b3adee078065fce2d339badf18c9cc736625982))
+* **deps-dev:** bump @typescript-eslint/eslint-plugin from 8.54.0 to 8.57.1 ([#48](https://github.com/washcycle/armada-vscode/issues/48)) ([0a50e50](https://github.com/washcycle/armada-vscode/commit/0a50e5021da5bdaa5bcf95d3f485faa51bad165c))
+* **deps-dev:** bump glob from 13.0.3 to 13.0.6 ([#44](https://github.com/washcycle/armada-vscode/issues/44)) ([9115ccd](https://github.com/washcycle/armada-vscode/commit/9115ccdace618e4d5e0da0190632801bb187355f))
+
 ## [0.2.4](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.3...armada-vscode-v0.2.4) (2026-03-17)
 
 
