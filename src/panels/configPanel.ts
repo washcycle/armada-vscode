@@ -83,7 +83,7 @@ export class ConfigPanel {
                         message: result.message
                     });
                 } else if (message.command === 'switchContext') {
-                    vscode.commands.executeCommand('armada.switchContext');
+                    vscode.commands.executeCommand('armada.switchContext', message.context);
                 } else if (message.command === 'revealSecret') {
                     const value = this.resolveSecretValue(this._config, message.field);
                     this.panel.webview.postMessage({
@@ -128,7 +128,7 @@ export class ConfigPanel {
             <div class="row">
                 <span class="label">Context</span>
                 <span class="value">
-                    <select id="ctxSelect" onchange="switchContext(this.value)">
+                    <select id="ctxSelect">
                         ${contexts.map(c => `<option value="${esc(c)}"${c === ctx ? ' selected' : ''}>${esc(c)}</option>`).join('')}
                     </select>
                 </span>
@@ -183,7 +183,7 @@ export class ConfigPanel {
             </div>
 
             <div class="section">
-                <button id="testBtn" onclick="testConnection()">Test Connection</button>
+                <button id="testBtn">Test Connection</button>
                 <span id="spinner" class="spinner hidden">&#8987;</span>
                 <div id="testResult" class="hidden"></div>
             </div>
@@ -219,7 +219,7 @@ export class ConfigPanel {
                         <span id="masked-${esc(key)}" class="masked">••••••••</span>
                         <span id="plain-${esc(key)}" class="hidden mono"></span>
                         <button class="inline-btn" id="toggle-${esc(key)}"
-                            onclick="toggleSecret('${esc(key)}')">Show</button>
+                            data-key="${esc(key)}">Show</button>
                     </span>
                 </div>`);
             } else {
@@ -294,37 +294,40 @@ export class ConfigPanel {
 </head>
 <body>
 ${body}
-<script>
+<script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
 
-  function testConnection() {
+  document.getElementById('testBtn').addEventListener('click', () => {
     const btn = document.getElementById('testBtn');
     const spinner = document.getElementById('spinner');
     const result = document.getElementById('testResult');
     btn.disabled = true;
     spinner.classList.remove('hidden');
-    result.classList.add('hidden');
     result.className = 'hidden';
     vscode.postMessage({ command: 'testConnection' });
+  });
+
+  const ctxSelect = document.getElementById('ctxSelect');
+  if (ctxSelect) {
+    ctxSelect.addEventListener('change', () => {
+      vscode.postMessage({ command: 'switchContext', context: ctxSelect.value });
+    });
   }
 
-  function toggleSecret(field) {
-    const masked = document.getElementById('masked-' + field);
-    const plain = document.getElementById('plain-' + field);
-    const btn = document.getElementById('toggle-' + field);
-    if (btn.textContent === 'Show') {
-      vscode.postMessage({ command: 'revealSecret', field: field });
-    } else {
-      masked.classList.remove('hidden');
-      plain.classList.add('hidden');
-      btn.textContent = 'Show';
-    }
-  }
-
-  function switchContext(ctx) {
-    // Context switching still goes through the extension command
-    vscode.postMessage({ command: 'switchContext', context: ctx });
-  }
+  document.querySelectorAll('.inline-btn[data-key]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.getAttribute('data-key');
+      const masked = document.getElementById('masked-' + field);
+      const plain = document.getElementById('plain-' + field);
+      if (btn.textContent === 'Show') {
+        vscode.postMessage({ command: 'revealSecret', field: field });
+      } else {
+        masked.classList.remove('hidden');
+        plain.classList.add('hidden');
+        btn.textContent = 'Show';
+      }
+    });
+  });
 
   window.addEventListener('message', (event) => {
     const msg = event.data;

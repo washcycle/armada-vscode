@@ -205,6 +205,11 @@
         {
           "command": "armada.clearMonitoredJobSets",
           "when": "view == armadaJobsView"
+        },
+        {
+          "command": "armada.showConfig",
+          "when": "view == armadaJobsView",
+          "group": "navigation"
         }
       ],
       "view/item/context": [

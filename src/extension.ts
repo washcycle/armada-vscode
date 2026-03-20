@@ -151,9 +151,9 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('armada.switchContext', async () => {
+        vscode.commands.registerCommand('armada.switchContext', async (contextName?: string) => {
             const previousContext = configManager.getCurrentConfig()?.currentContext;
-            await switchContextCommand(configManager);
+            await switchContextCommand(configManager, contextName);
             // Get updated config after context switch
             const config = configManager.getCurrentConfig();
             const newContext = config?.currentContext;
