@@ -48,6 +48,21 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
         this._onDidChangeTreeData.fire();
     }
 
+    /**
+     * Returns a count of jobs per state string from the in-memory jobs map.
+     * No API calls are made. Returns {} if the map is empty.
+     */
+    getJobCounts(): Record<string, number> {
+        const counts: Record<string, number> = {};
+        for (const jobSet of this.jobs.values()) {
+            for (const job of jobSet.jobs) {
+                const state = job.jobInfo.state as string;
+                counts[state] = (counts[state] ?? 0) + 1;
+            }
+        }
+        return counts;
+    }
+
     getTreeItem(element: TreeItem): vscode.TreeItem {
         return element;
     }

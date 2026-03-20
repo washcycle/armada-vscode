@@ -22,6 +22,35 @@ import { reprioritizeJobCommand } from './commands/reprioritizeJob';
 import { JobDetailPanel } from './panels/jobDetailPanel';
 import { ConfigPanel } from './panels/configPanel';
 
+/**
+ * Builds the label for the job counts status bar item.
+ * Uses codicons: $(play) for RUNNING, $(error) for FAILED, $(clock) for QUEUED/PENDING.
+ * Zero counts are suppressed. Returns $(dash) if all counts are zero.
+ */
+export function buildJobCountLabel(counts: Record<string, number>): string {
+    const segments: string[] = [];
+
+    const running = counts['RUNNING'] ?? 0;
+    const failed = counts['FAILED'] ?? 0;
+    const queued = (counts['QUEUED'] ?? 0) + (counts['PENDING'] ?? 0);
+
+    if (running > 0) {
+        segments.push(`$(play) ${running}`);
+    }
+    if (failed > 0) {
+        segments.push(`$(error) ${failed}`);
+    }
+    if (queued > 0) {
+        segments.push(`$(clock) ${queued}`);
+    }
+
+    if (segments.length === 0) {
+        return '$(dash)';
+    }
+
+    return segments.join('  ');
+}
+
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Armada extension is now active');
 
@@ -119,6 +148,34 @@ export async function activate(context: vscode.ExtensionContext) {
         statusBarItem.show();
     };
 
+    // Second status bar item: job counts (priority one less than context item)
+    const jobCountsBarItem = vscode.window.createStatusBarItem(
+        vscode.StatusBarAlignment.Left,
+        99
+    );
+    // armada.filterByState is not yet implemented (planned: sidebar-state-filter)
+    // jobCountsBarItem.command = { command: 'armada.filterByState', arguments: ['FAILED'], title: 'Filter by Failed' };
+
+    const updateJobCountsBar = () => {
+        const showCounts = vscode.workspace.getConfiguration('armada').get('statusBar.showJobCounts', true);
+        if (!showCounts) {
+            jobCountsBarItem.hide();
+            return;
+        }
+
+        const counts = jobTreeProvider.getJobCounts();
+        jobCountsBarItem.text = buildJobCountLabel(counts);
+
+        const config = configManager.getCurrentConfig();
+        const ctx = config?.currentContext || 'default';
+        const running = counts['RUNNING'] ?? 0;
+        const failed = counts['FAILED'] ?? 0;
+        const queued = (counts['QUEUED'] ?? 0) + (counts['PENDING'] ?? 0);
+        jobCountsBarItem.tooltip = `Armada [${ctx}]: ${running} running, ${failed} failed, ${queued} queued`;
+
+        jobCountsBarItem.show();
+    };
+
     const wireClientCallbacks = (client: ArmadaClient) => {
         client.onConnectionStateChange = () => updateStatusBar();
     };
@@ -128,6 +185,12 @@ export async function activate(context: vscode.ExtensionContext) {
     }
 
     updateStatusBar();
+    updateJobCountsBar();
+
+    // Update job counts bar after every tree data change (i.e., every refresh)
+    context.subscriptions.push(
+        jobTreeProvider.onDidChangeTreeData(() => updateJobCountsBar())
+    );
 
     // Register commands
     context.subscriptions.push(
@@ -289,6 +352,7 @@ export async function activate(context: vscode.ExtensionContext) {
     // Register tree view and status bar
     context.subscriptions.push(treeView);
     context.subscriptions.push(statusBarItem);
+    context.subscriptions.push(jobCountsBarItem);
 
     // Auto-refresh jobs if enabled
     const config = vscode.workspace.getConfiguration('armada');
