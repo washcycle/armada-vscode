@@ -286,6 +286,11 @@
           "type": "number",
           "default": 100,
           "description": "Maximum number of jobs to display"
+        },
+        "armada.statusBar.showJobCounts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show live running/failed/queued job counts in the status bar."
         }
       }
     },
