@@ -243,7 +243,7 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('armada.showConfig', () => {
             const config = configManager.getCurrentConfig();
-            ConfigPanel.show(config, armadaClient, configManager.getContexts());
+            ConfigPanel.show(config, armadaClient);
         })
     );
 
