@@ -19,8 +19,11 @@ export async function switchContextCommand(configManager: ConfigManager, context
     const currentConfig = configManager.getCurrentConfig();
     const currentContext = currentConfig?.currentContext;
 
-    // If a context name was provided (e.g. from the config panel dropdown), apply it directly
-    if (contextName) {
+    // If a context name was provided (e.g. from the config panel dropdown), apply it directly.
+    // Guard: typeof check rejects non-string args — VS Code passes a TreeViewItem object when
+    // the command is invoked from the view title action bar, which would otherwise stringify to
+    // "[object Object]" and be passed to configManager.switchContext().
+    if (typeof contextName === 'string' && contextName) {
         if (contextName === currentContext) {
             return;
         }

@@ -17,5 +17,5 @@
 
 ## 4. Tests
 
-- [ ] 4.1 Unit test `getJobCounts()` — empty map, mixed states, zero suppression
-- [ ] 4.2 Unit test label builder function — correct codicon format, zero suppression
+- [x] 4.1 Unit test `getJobCounts()` — empty map, mixed states, zero suppression
+- [x] 4.2 Unit test label builder function — correct codicon format, zero suppression

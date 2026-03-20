@@ -21,35 +21,9 @@ import { cancelJobSetCommand } from './commands/cancelJobSet';
 import { reprioritizeJobCommand } from './commands/reprioritizeJob';
 import { JobDetailPanel } from './panels/jobDetailPanel';
 import { ConfigPanel } from './panels/configPanel';
+import { buildJobCountLabel } from './util/jobCountLabel';
 
-/**
- * Builds the label for the job counts status bar item.
- * Uses codicons: $(play) for RUNNING, $(error) for FAILED, $(clock) for QUEUED/PENDING.
- * Zero counts are suppressed. Returns $(dash) if all counts are zero.
- */
-export function buildJobCountLabel(counts: Record<string, number>): string {
-    const segments: string[] = [];
-
-    const running = counts['RUNNING'] ?? 0;
-    const failed = counts['FAILED'] ?? 0;
-    const queued = (counts['QUEUED'] ?? 0) + (counts['PENDING'] ?? 0);
-
-    if (running > 0) {
-        segments.push(`$(play) ${running}`);
-    }
-    if (failed > 0) {
-        segments.push(`$(error) ${failed}`);
-    }
-    if (queued > 0) {
-        segments.push(`$(clock) ${queued}`);
-    }
-
-    if (segments.length === 0) {
-        return '$(dash)';
-    }
-
-    return segments.join('  ');
-}
+export { buildJobCountLabel };
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Armada extension is now active');
@@ -216,7 +190,10 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('armada.switchContext', async (contextName?: string) => {
             const previousContext = configManager.getCurrentConfig()?.currentContext;
-            await switchContextCommand(configManager, contextName);
+            // Guard: VS Code passes a TreeView object when the command is triggered from the
+            // view title action bar. Only forward contextName if it is actually a string.
+            const resolvedName = typeof contextName === 'string' ? contextName : undefined;
+            await switchContextCommand(configManager, resolvedName);
             // Get updated config after context switch
             const config = configManager.getCurrentConfig();
             const newContext = config?.currentContext;
