@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.3.0...armada-vscode-v0.4.0) (2026-03-20)
+
+
+### Features
+
+* **diagnostics:** add connection health status bar and config viewer panel ([#56](https://github.com/washcycle/armada-vscode/issues/56)) ([62d921e](https://github.com/washcycle/armada-vscode/commit/62d921e07e61a57c335add659599f8ca40b9204b))
+* status bar job counts, [object Object] fix, regression tests ([#59](https://github.com/washcycle/armada-vscode/issues/59)) ([af8fc2a](https://github.com/washcycle/armada-vscode/commit/af8fc2a6dd48a3d2adf4d313929c14887e87d1d7))
+
+
+### Bug Fixes
+
+* **dev:** clean up CI redis resources before Helm install ([#53](https://github.com/washcycle/armada-vscode/issues/53)) ([34ba160](https://github.com/washcycle/armada-vscode/commit/34ba1600331327c8f3f7ace3507d761e59ce8732))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump flatted ([#58](https://github.com/washcycle/armada-vscode/issues/58)) ([9c701d1](https://github.com/washcycle/armada-vscode/commit/9c701d16fa52ae7357801698a398ec6523491249))
+
 ## [0.3.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.4...armada-vscode-v0.3.0) (2026-03-19)
 
 
