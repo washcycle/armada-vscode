@@ -24,7 +24,7 @@ describe('ArmadaClient', () => {
 
     it('testConnection succeeds against mock server', async () => {
         const result = await client.testConnection();
-        assert.strictEqual(result, true);
+        assert.strictEqual(result.ok, true);
     });
 
     it('submitJobs sends correct proto format and receives job IDs', async () => {
@@ -93,15 +93,14 @@ describe('ArmadaClient', () => {
         const tlsArmadaUrl = `https://${host}:${port}`;
 
         // Without forceNoTls, connecting to an HTTPS-style URL against the mock
-        // (which speaks plaintext) should fail.
+        // (which speaks plaintext) should fail — testConnection never throws but returns ok: false.
         const secureConfig: ResolvedConfig = {
             armadaUrl: tlsArmadaUrl,
             auth: { type: 'none' }
         };
         const secureClient = new ArmadaClient(secureConfig);
-        await assert.rejects(async () => {
-            await secureClient.testConnection();
-        });
+        const secureResult = await secureClient.testConnection();
+        assert.strictEqual(secureResult.ok, false, 'TLS client against plaintext server should fail');
 
         // With forceNoTls set, the same URL should connect successfully using insecure credentials.
         const insecureConfig: ResolvedConfig = {
@@ -111,6 +110,6 @@ describe('ArmadaClient', () => {
         };
         const insecureClient = new ArmadaClient(insecureConfig);
         const result = await insecureClient.testConnection();
-        assert.strictEqual(result, true);
+        assert.strictEqual(result.ok, true);
     });
 });

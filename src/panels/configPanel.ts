@@ -9,7 +9,8 @@ function esc(s: string): string {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function isMasked(key: string): boolean {
@@ -21,25 +22,27 @@ export class ConfigPanel {
 
     private readonly panel: vscode.WebviewPanel;
     private disposables: vscode.Disposable[] = [];
+    private _config: ResolvedConfig | null;
+    private _client: ArmadaClient | undefined;
 
     static show(
         config: ResolvedConfig | null,
-        client: ArmadaClient | undefined,
-        contexts: string[]
+        client: ArmadaClient | undefined
     ): void {
         if (ConfigPanel.instance) {
             ConfigPanel.instance.panel.reveal();
-            ConfigPanel.instance.update(config, client, contexts);
+            ConfigPanel.instance.update(config, client);
             return;
         }
-        new ConfigPanel(config, client, contexts);
+        new ConfigPanel(config, client);
     }
 
     private constructor(
         config: ResolvedConfig | null,
-        client: ArmadaClient | undefined,
-        contexts: string[]
+        client: ArmadaClient | undefined
     ) {
+        this._config = config;
+        this._client = client;
 
         this.panel = vscode.window.createWebviewPanel(
             'armadaConfig',
@@ -62,7 +65,7 @@ export class ConfigPanel {
         this.panel.webview.onDidReceiveMessage(
             async (message) => {
                 if (message.command === 'testConnection') {
-                    if (!client) {
+                    if (!this._client) {
                         this.panel.webview.postMessage({
                             command: 'testResult',
                             ok: false,
@@ -70,17 +73,15 @@ export class ConfigPanel {
                         });
                         return;
                     }
-                    const result = await client.testConnection();
+                    const result = await this._client.testConnection();
                     this.panel.webview.postMessage({
                         command: 'testResult',
                         ok: result.ok,
                         detail: result.detail,
                         message: result.message
                     });
-                } else if (message.command === 'switchContext') {
-                    vscode.commands.executeCommand('armada.switchContext');
                 } else if (message.command === 'revealSecret') {
-                    const value = this.resolveSecretValue(config, message.field);
+                    const value = this.resolveSecretValue(this._config, message.field);
                     this.panel.webview.postMessage({
                         command: 'secretRevealed',
                         field: message.field,
@@ -92,7 +93,7 @@ export class ConfigPanel {
             this.disposables
         );
 
-        this.update(config, client, contexts);
+        this.update(config, client);
     }
 
     private resolveSecretValue(config: ResolvedConfig | null, field: string): string | undefined {
@@ -101,11 +102,13 @@ export class ConfigPanel {
         return creds[field] !== undefined ? String(creds[field]) : undefined;
     }
 
-    update(config: ResolvedConfig | null, _client: ArmadaClient | undefined, contexts: string[]): void {
-        this.panel.webview.html = this.renderHtml(config, contexts);
+    update(config: ResolvedConfig | null, client: ArmadaClient | undefined): void {
+        this._config = config;
+        this._client = client;
+        this.panel.webview.html = this.renderHtml(config);
     }
 
-    private renderHtml(config: ResolvedConfig | null, contexts: string[]): string {
+    private renderHtml(config: ResolvedConfig | null): string {
         if (!config) {
             return this.wrapHtml(`
                 <div class="section">
@@ -117,24 +120,13 @@ export class ConfigPanel {
 
         const ctx = config.currentContext || 'default';
 
-        const contextDropdown = contexts.length > 1 ? `
-            <div class="row">
-                <span class="label">Context</span>
-                <span class="value">
-                    <select id="ctxSelect" onchange="switchContext(this.value)">
-                        ${contexts.map(c => `<option value="${esc(c)}"${c === ctx ? ' selected' : ''}>${esc(c)}</option>`).join('')}
-                    </select>
-                </span>
-            </div>` : `
-            <div class="row">
-                <span class="label">Context</span>
-                <span class="value">${esc(ctx)}</span>
-            </div>`;
-
         const tls = config.forceNoTls ? 'Disabled (forceNoTls)' : 'Enabled (auto-detect)';
 
         const connectionRows = `
-            ${contextDropdown}
+            <div class="row">
+                <span class="label">Context</span>
+                <span class="value">${esc(ctx)}</span>
+            </div>
             <div class="row">
                 <span class="label">Server URL</span>
                 <span class="value mono">${esc(config.armadaUrl)}</span>
@@ -176,7 +168,7 @@ export class ConfigPanel {
             </div>
 
             <div class="section">
-                <button id="testBtn" onclick="testConnection()">Test Connection</button>
+                <button id="testBtn">Test Connection</button>
                 <span id="spinner" class="spinner hidden">&#8987;</span>
                 <div id="testResult" class="hidden"></div>
             </div>
@@ -212,7 +204,7 @@ export class ConfigPanel {
                         <span id="masked-${esc(key)}" class="masked">••••••••</span>
                         <span id="plain-${esc(key)}" class="hidden mono"></span>
                         <button class="inline-btn" id="toggle-${esc(key)}"
-                            onclick="toggleSecret('${esc(key)}')">Show</button>
+                            data-key="${esc(key)}">Show</button>
                     </span>
                 </div>`);
             } else {
@@ -227,11 +219,12 @@ export class ConfigPanel {
     }
 
     private wrapHtml(body: string): string {
+        const nonce = Buffer.from(Math.random().toString(), 'utf-8').toString('base64');
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style>
   body {
     font-family: var(--vscode-font-family);
@@ -253,12 +246,6 @@ export class ConfigPanel {
   .muted { color: var(--vscode-descriptionForeground); }
   .masked { letter-spacing: 0.1em; }
   .hidden { display: none; }
-  select {
-    background: var(--vscode-dropdown-background);
-    color: var(--vscode-dropdown-foreground);
-    border: 1px solid var(--vscode-dropdown-border);
-    padding: 2px 4px;
-  }
   button {
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
@@ -286,37 +273,33 @@ export class ConfigPanel {
 </head>
 <body>
 ${body}
-<script>
+<script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
 
-  function testConnection() {
+  document.getElementById('testBtn').addEventListener('click', () => {
     const btn = document.getElementById('testBtn');
     const spinner = document.getElementById('spinner');
     const result = document.getElementById('testResult');
     btn.disabled = true;
     spinner.classList.remove('hidden');
-    result.classList.add('hidden');
     result.className = 'hidden';
     vscode.postMessage({ command: 'testConnection' });
-  }
+  });
 
-  function toggleSecret(field) {
-    const masked = document.getElementById('masked-' + field);
-    const plain = document.getElementById('plain-' + field);
-    const btn = document.getElementById('toggle-' + field);
-    if (btn.textContent === 'Show') {
-      vscode.postMessage({ command: 'revealSecret', field: field });
-    } else {
-      masked.classList.remove('hidden');
-      plain.classList.add('hidden');
-      btn.textContent = 'Show';
-    }
-  }
-
-  function switchContext(ctx) {
-    // Context switching still goes through the extension command
-    vscode.postMessage({ command: 'switchContext', context: ctx });
-  }
+  document.querySelectorAll('.inline-btn[data-key]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const field = btn.getAttribute('data-key');
+      const masked = document.getElementById('masked-' + field);
+      const plain = document.getElementById('plain-' + field);
+      if (btn.textContent === 'Show') {
+        vscode.postMessage({ command: 'revealSecret', field: field });
+      } else {
+        masked.classList.remove('hidden');
+        plain.classList.add('hidden');
+        btn.textContent = 'Show';
+      }
+    });
+  });
 
   window.addEventListener('message', (event) => {
     const msg = event.data;

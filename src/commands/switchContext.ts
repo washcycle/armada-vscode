@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ConfigManager } from '../config/configManager';
 
-export async function switchContextCommand(configManager: ConfigManager): Promise<void> {
+export async function switchContextCommand(configManager: ConfigManager, contextName?: string): Promise<void> {
     const contexts = configManager.getContexts();
 
     if (contexts.length === 0) {
@@ -16,15 +16,29 @@ export async function switchContextCommand(configManager: ConfigManager): Promis
         return;
     }
 
+    const currentConfig = configManager.getCurrentConfig();
+    const currentContext = currentConfig?.currentContext;
+
+    // If a context name was provided (e.g. from the config panel dropdown), apply it directly
+    if (contextName) {
+        if (contextName === currentContext) {
+            return;
+        }
+        try {
+            await configManager.switchContext(contextName);
+            vscode.window.showInformationMessage(`Switched to context: ${contextName}`);
+        } catch (error: any) {
+            vscode.window.showErrorMessage(`Failed to switch context: ${error.message}`);
+        }
+        return;
+    }
+
     if (contexts.length === 1) {
         vscode.window.showInformationMessage(
             `Only one context available: ${contexts[0]}`
         );
         return;
     }
-
-    const currentConfig = configManager.getCurrentConfig();
-    const currentContext = currentConfig?.currentContext;
 
     // Create quick pick items with current context marked
     const items = contexts.map(context => ({

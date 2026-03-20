@@ -47,6 +47,7 @@ export class ArmadaClient {
     }
 
     private updateConnectionState(state: ConnectionState, detail?: string): void {
+        if (state === this.connectionState) { return; }
         this.connectionState = state;
         if (this.onConnectionStateChange) {
             this.onConnectionStateChange(state, detail);
@@ -55,8 +56,10 @@ export class ArmadaClient {
 
     private classifyGrpcError(error: any): void {
         const code: number | undefined = error?.code;
-        if (code === 14 || code === 13) {
+        if (code === 14) {
             this.updateConnectionState('error', `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`);
+        } else if (code === 13) {
+            this.updateConnectionState('error', `Armada server returned an internal error.`);
         } else if (code === 16 || code === 7) {
             this.updateConnectionState('auth-error', 'Authentication failed. Check your credentials.');
         }
@@ -889,7 +892,6 @@ export class ArmadaClient {
                     // Application-level errors mean transport is alive
                     const APPLICATION_LEVEL_CODES = new Set([2, 5, 12]);
                     if (code !== undefined && APPLICATION_LEVEL_CODES.has(code)) {
-                        this.updateConnectionState('connected');
                         resolve({ ok: true, detail: 'Server reachable (no active queues data available)' });
                         return;
                     }

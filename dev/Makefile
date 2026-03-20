@@ -1,4 +1,4 @@
-.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces create-test-queue
+.PHONY: up down status logs kind-create kind-delete helm-repos install-cert-manager uninstall-cert-manager install-armada-deps uninstall-armada-deps install-armada-operator uninstall-armada-operator apply-armada-crs delete-armada-crs apply-priority-class delete-priority-class ensure-namespaces wait-for-armada-server create-test-queue create-pulsar-service
 
 KIND_CLUSTER_NAME ?= armada
 KIND_CONTEXT := kind-$(KIND_CLUSTER_NAME)
@@ -24,6 +24,7 @@ ARMADA_CRS_CI := \
 	$(ARMADA_CRS_DIR)/executor.yaml
 PRIORITY_CLASS := $(MANIFEST_DIR)/priority-class.yaml
 OPERATOR_RBAC_PATCH := $(MANIFEST_DIR)/operator-rbac-patch.yaml
+BINOCULARS_RBAC := $(MANIFEST_DIR)/binoculars-rbac.yaml
 PULSAR_VALUES := $(MANIFEST_DIR)/pulsar.values.yaml
 REDIS_VALUES := $(MANIFEST_DIR)/redis.values.yaml
 POSTGRES_VALUES := $(MANIFEST_DIR)/postgres.values.yaml
@@ -33,7 +34,7 @@ PULSAR_VALUES_CI := $(MANIFEST_DIR)/pulsar.values.ci.yaml
 REDIS_VALUES_CI := $(MANIFEST_DIR)/redis.values.ci.yaml
 POSTGRES_VALUES_CI := $(MANIFEST_DIR)/postgres.values.ci.yaml
 
-up: kind-create helm-repos install-cert-manager install-armada-deps install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs ## Stand up a kind cluster with Armada via Helm + Operator
+up: kind-create helm-repos install-cert-manager install-armada-deps create-pulsar-service install-armada-operator patch-operator-rbac apply-priority-class apply-armada-crs wait-for-armada-server create-test-queue ## Stand up a kind cluster with Armada via Helm + Operator
 
 up-ci: ## Minimal CI setup with reduced resources
 	@set -e; \
@@ -45,6 +46,7 @@ up-ci: ## Minimal CI setup with reduced resources
 		wait $$p1; \
 		wait $$p2; \
 		wait $$p3; \
+		$(MAKE) create-pulsar-service; \
 		$(MAKE) install-armada-operator; \
 		$(MAKE) patch-operator-rbac; \
 		$(MAKE) wait-for-operator-webhook; \
@@ -129,6 +131,7 @@ uninstall-pulsar:
 	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/pulsar-standalone.yaml --ignore-not-found
 
 install-redis:
+	kubectl --context $(KIND_CONTEXT) delete -f operator/quickstart/redis-simple.yaml --ignore-not-found
 	helm upgrade --install redis dandydev/redis-ha -n $(DATA_NAMESPACE) --kube-context $(KIND_CONTEXT) -f $(REDIS_VALUES) --wait --timeout $(HELM_TIMEOUT)
 
 install-redis-ci:
@@ -170,8 +173,9 @@ wait-for-operator-webhook: ## Wait for the operator webhook to be ready before a
 		sleep 2; \
 	done
 
-patch-operator-rbac: ## Patch the operator ClusterRole to allow binoculars deployment
+patch-operator-rbac: ## Patch the operator ClusterRole and grant binoculars pod log access
 	kubectl --context $(KIND_CONTEXT) apply -f $(OPERATOR_RBAC_PATCH)
+	kubectl --context $(KIND_CONTEXT) apply -f $(BINOCULARS_RBAC)
 
 uninstall-armada-operator: ## Remove the Armada Operator chart
 	helm uninstall armada-operator -n $(ARMADA_SYSTEM_NAMESPACE) --kube-context $(KIND_CONTEXT) || true
@@ -198,6 +202,13 @@ apply-armada-crs-ci: ## Apply a minimal Armada CR set for CI (supports ARMADA_IM
 
 delete-armada-crs: ## Delete the demo Armada CRs
 	kubectl --context $(KIND_CONTEXT) delete -n $(ARMADA_NAMESPACE) -f $(ARMADA_CRS_DIR) --ignore-not-found
+
+create-pulsar-service: ## Create a 'pulsar' ClusterIP service in the data namespace pointing to pulsar-proxy
+	@echo "Creating pulsar service alias in $(DATA_NAMESPACE) namespace..."
+	kubectl --context $(KIND_CONTEXT) apply -n $(DATA_NAMESPACE) -f $(MANIFEST_DIR)/pulsar-service.yaml
+
+wait-for-armada-server: ## Wait for armada-server deployment to be available
+	kubectl --context $(KIND_CONTEXT) wait --for=condition=Available --timeout=330s -n $(ARMADA_NAMESPACE) deployment/armada-server
 
 create-test-queue: ## Create a test queue for integration testing
 	@echo "Creating test queue..."
