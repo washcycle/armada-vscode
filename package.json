@@ -272,6 +272,11 @@
           "default": "",
           "description": "Path to armadactl config file (default: ~/.armadactl.yaml)"
         },
+        "armada.caCertPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Path to a PEM CA certificate bundle to trust for TLS, in addition to the system roots. Needed on corporate networks where a TLS-inspecting proxy (Zscaler, Netskope, a company CA) re-signs traffic, which otherwise fails with `UNAVAILABLE` and a certificate error. Supports `~`. A `caCertPath` on the active armadactl context takes precedence over this setting."
+        },
         "armada.autoRefresh": {
           "type": "boolean",
           "default": true,

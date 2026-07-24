@@ -74,6 +74,7 @@ export class ConfigManager {
                 binocularsUrlPattern: context.binocularsUrlPattern,
                 lookoutUrl: context.lookoutUrl,
                 forceNoTls: context.forceNoTls,
+                caCertPath: this.resolveCaCertPath(context.caCertPath),
                 currentContext: contextName,
                 auth: this.extractAuth(context)
             };
@@ -84,11 +85,28 @@ export class ConfigManager {
             return {
                 armadaUrl: config.armadaUrl,
                 forceNoTls: (config as any).forceNoTls,
+                caCertPath: this.resolveCaCertPath((config as any).caCertPath),
                 auth: this.extractAuth(config as any)
             };
         }
 
         return null;
+    }
+
+    /**
+     * Pick the CA bundle to trust for TLS.
+     *
+     * A per-context `caCertPath` in the armadactl config wins, so different
+     * clusters can use different bundles; the `armada.caCertPath` setting is the
+     * fallback for the common case of one corporate proxy in front of
+     * everything.
+     */
+    private resolveCaCertPath(contextCaCertPath?: string): string | undefined {
+        if (contextCaCertPath && contextCaCertPath.trim() !== '') {
+            return contextCaCertPath;
+        }
+        const setting = vscode.workspace.getConfiguration('armada').get<string>('caCertPath');
+        return setting && setting.trim() !== '' ? setting : undefined;
     }
 
     /**

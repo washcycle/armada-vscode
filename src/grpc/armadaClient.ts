@@ -1,9 +1,11 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
+import * as tls from 'tls';
 import { ResolvedConfig } from '../types/config';
 import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult } from '../types/armada';
 import { buildAuthHeader, isSecureCredentials, makeAuthInterceptor, withCallCredentials } from './auth';
+import { buildTrustStore, countCertificates, describeCertificateError, resolveCertPath } from './caCerts';
 
 /**
  * Strip any `http://` or `https://` scheme prefix from a URL so that the
@@ -36,9 +38,16 @@ export function usesTls(url: string, forceNoTls?: boolean): boolean {
  * port 443.  Passing `forceNoTls: true` always returns insecure credentials
  * regardless of the URL (useful for development / plain-text servers).
  */
-export function selectCredentials(url: string, forceNoTls?: boolean): grpc.ChannelCredentials {
+export function selectCredentials(
+    url: string,
+    forceNoTls?: boolean,
+    rootCerts?: Buffer
+): grpc.ChannelCredentials {
     return usesTls(url, forceNoTls)
-        ? grpc.credentials.createSsl()
+        // A CA bundle replaces the default roots for this channel. Corporate
+        // TLS-inspecting proxies re-sign traffic with a CA that is not in
+        // Node's bundled root store, so without this the handshake fails.
+        ? grpc.credentials.createSsl(rootCerts)
         : grpc.credentials.createInsecure();
 }
 
@@ -51,6 +60,8 @@ export class ArmadaClient {
     private config: ResolvedConfig;
     private initialized: boolean = false;
     private cachedAuthHeader: string | undefined;
+    private trustStore: Buffer | undefined;
+    private trustStoreLoaded: boolean = false;
 
     connectionState: ConnectionState = 'unknown';
     onConnectionStateChange: ((state: ConnectionState, detail?: string) => void) | undefined;
@@ -77,8 +88,17 @@ export class ArmadaClient {
         const suffix = details ? ` Server said: ${details}` : '';
 
         if (code === 14) {
-            this.logError(`UNAVAILABLE from ${this.config.armadaUrl}.${suffix}`);
-            this.updateConnectionState('error', `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`);
+            // A certificate rejection arrives as UNAVAILABLE with the OpenSSL
+            // reason buried in `details`, which reads like the server is down.
+            // Corporate TLS proxies are the usual cause, so name the remedy.
+            const certHint = describeCertificateError(details, this.activeCertPath());
+            this.logError(`UNAVAILABLE from ${this.config.armadaUrl}.${suffix}${certHint}`);
+            this.updateConnectionState(
+                'error',
+                certHint
+                    ? `TLS certificate verification failed for ${this.config.armadaUrl}.${certHint}`
+                    : `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`
+            );
         } else if (code === 13) {
             this.logError(`INTERNAL error from ${this.config.armadaUrl}.${suffix}`);
             this.updateConnectionState('error', `Armada server returned an internal error.${suffix}`);
@@ -199,7 +219,7 @@ export class ArmadaClient {
      * unless `forceNoTls` is set in the config.
      */
     private getCredentials(url: string): grpc.ChannelCredentials {
-        const channelCredentials = selectCredentials(url, this.config.forceNoTls);
+        const channelCredentials = selectCredentials(url, this.config.forceNoTls, this.getTrustStore());
 
         // Attach the credentials from the armadactl config to every call on
         // this channel. Without this the extension parses basicAuth/execAuth
@@ -225,6 +245,51 @@ export class ArmadaClient {
 
     private hasAuth(): boolean {
         return !!this.config.auth && this.config.auth.type !== 'none';
+    }
+
+    /**
+     * The CA bundle to trust, read once per client.
+     *
+     * A configured-but-unreadable bundle is reported and then ignored: failing
+     * the whole client would leave the user with no UI at all, while continuing
+     * with the default roots at least keeps publicly-signed endpoints working.
+     * The message says which file to fix.
+     */
+    private getTrustStore(): Buffer | undefined {
+        if (this.trustStoreLoaded) {
+            return this.trustStore;
+        }
+        this.trustStoreLoaded = true;
+
+        try {
+            this.trustStore = buildTrustStore(this.config.caCertPath);
+            if (this.trustStore && this.config.caCertPath) {
+                const extra = countCertificates(this.trustStore) - tls.rootCertificates.length;
+                this.logInfo(
+                    `Trusting ${extra} extra CA certificate(s) from ` +
+                    `${resolveCertPath(this.config.caCertPath)} in addition to the system roots.`
+                );
+            }
+        } catch (error: any) {
+            this.trustStore = undefined;
+            this.logError(
+                `${error.message} Falling back to the default certificate store, ` +
+                'so connections through a TLS-inspecting proxy will likely fail.'
+            );
+        }
+
+        return this.trustStore;
+    }
+
+    /**
+     * The CA bundle path actually in effect, or undefined if none is.
+     *
+     * A configured-but-unloadable bundle is *not* in effect: telling the user
+     * their bundle "did not contain the signing CA" would send them auditing a
+     * file that was never read. The load failure is reported separately.
+     */
+    private activeCertPath(): string | undefined {
+        return this.getTrustStore() ? this.config.caCertPath : undefined;
     }
 
     /**
@@ -271,6 +336,13 @@ export class ArmadaClient {
             return this.cachedAuthHeader;
         }
         return buildAuthHeader(this.config.auth);
+    }
+
+    private logInfo(message: string): void {
+        console.log(`[Armada] ${message}`);
+        if (this.onLogMessage) {
+            this.onLogMessage(message);
+        }
     }
 
     private logWarning(message: string): void {
