@@ -23,10 +23,29 @@ function loadProto(protoFile: string): grpc.GrpcObject {
 export class MockArmadaServer {
     private server: grpc.Server;
     private port: number = 0;
+    /** Metadata from the most recent call, so tests can assert on auth headers. */
+    private lastMetadata: grpc.Metadata | undefined;
 
     constructor() {
         this.server = new grpc.Server();
         this.registerServices();
+    }
+
+    /** The `authorization` header of the most recent call, if any. */
+    getLastAuthorization(): string | undefined {
+        const values = this.lastMetadata?.get('authorization');
+        return values && values.length > 0 ? String(values[0]) : undefined;
+    }
+
+    /** Forget any recorded metadata, so a test starts from a known state. */
+    resetLastMetadata(): void {
+        this.lastMetadata = undefined;
+    }
+
+    private recordMetadata(call: any): void {
+        if (call?.metadata) {
+            this.lastMetadata = call.metadata;
+        }
     }
 
     private registerServices(): void {
@@ -74,6 +93,7 @@ export class MockArmadaServer {
 
     // Submit handlers
     private handleSubmitJobs(call: any, callback: any): void {
+        this.recordMetadata(call);
         const jobs: any[] = call.request.job_request_items || [];
         const items = jobs.map(() => ({
             job_id: crypto.randomUUID(),
@@ -87,6 +107,7 @@ export class MockArmadaServer {
     }
 
     private handleGetQueue(call: any, callback: any): void {
+        this.recordMetadata(call);
         callback(null, {
             name: call.request.name,
             priority_factor: 1,
@@ -96,6 +117,7 @@ export class MockArmadaServer {
     }
 
     private handleGetQueues(call: any): void {
+        this.recordMetadata(call);
         // Stream one queue then end
         call.write({
             queue: {
@@ -114,6 +136,7 @@ export class MockArmadaServer {
 
     // Event handlers
     private handleGetJobSetEvents(call: any): void {
+        this.recordMetadata(call);
         const jobId = crypto.randomUUID();
         const queue = call.request.queue || 'test-queue';
         const jobSetId = call.request.id || 'test-job-set';
