@@ -3,13 +3,8 @@ import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
 import { ResolvedConfig } from '../types/config';
 import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult } from '../types/armada';
+import { buildAuthHeader, isSecureCredentials, makeAuthInterceptor, withCallCredentials } from './auth';
 
-/**
- * Select gRPC channel credentials for a given endpoint URL.
- * Returns SSL credentials when the URL uses an `https://` scheme or targets
- * port 443.  Passing `forceNoTls: true` always returns insecure credentials
- * regardless of the URL (useful for development / plain-text servers).
- */
 /**
  * Strip any `http://` or `https://` scheme prefix from a URL so that the
  * result can be used as a bare `host:port` gRPC target string.
@@ -18,16 +13,33 @@ export function stripScheme(url: string): string {
     return url.replace(/^https?:\/\//, '');
 }
 
-export function selectCredentials(url: string, forceNoTls?: boolean): grpc.ChannelCredentials {
+/**
+ * Whether a given endpoint will be dialed over TLS: an `https://` scheme or a
+ * `:443` port, unless `forceNoTls` overrides it.
+ *
+ * Exposed separately from `selectCredentials` so callers can branch on the
+ * transport without building (and, for TLS, loading root certs into) a
+ * credentials object.
+ */
+export function usesTls(url: string, forceNoTls?: boolean): boolean {
     if (forceNoTls) {
-        return grpc.credentials.createInsecure();
+        return false;
     }
     // Strip the scheme and path, then check whether the host:port portion ends with :443
     const hostPort = url.replace(/^https?:\/\//, '').split('/')[0];
-    if (url.startsWith('https://') || hostPort.endsWith(':443')) {
-        return grpc.credentials.createSsl();
-    }
-    return grpc.credentials.createInsecure();
+    return url.startsWith('https://') || hostPort.endsWith(':443');
+}
+
+/**
+ * Select gRPC channel credentials for a given endpoint URL.
+ * Returns SSL credentials when the URL uses an `https://` scheme or targets
+ * port 443.  Passing `forceNoTls: true` always returns insecure credentials
+ * regardless of the URL (useful for development / plain-text servers).
+ */
+export function selectCredentials(url: string, forceNoTls?: boolean): grpc.ChannelCredentials {
+    return usesTls(url, forceNoTls)
+        ? grpc.credentials.createSsl()
+        : grpc.credentials.createInsecure();
 }
 
 export class ArmadaClient {
@@ -38,9 +50,12 @@ export class ArmadaClient {
     private binocularsClients: Map<string, any> = new Map(); // Cluster-specific Binoculars clients
     private config: ResolvedConfig;
     private initialized: boolean = false;
+    private cachedAuthHeader: string | undefined;
 
     connectionState: ConnectionState = 'unknown';
     onConnectionStateChange: ((state: ConnectionState, detail?: string) => void) | undefined;
+    /** Optional sink so connection/auth failures reach the output channel. */
+    onLogMessage: ((message: string) => void) | undefined;
 
     constructor(config: ResolvedConfig) {
         this.config = config;
@@ -56,12 +71,26 @@ export class ArmadaClient {
 
     private classifyGrpcError(error: any): void {
         const code: number | undefined = error?.code;
+        // The server's own explanation is the most useful part of the error and
+        // used to be dropped entirely, which made misconfigurations undebuggable.
+        const details: string = error?.details || error?.message || '';
+        const suffix = details ? ` Server said: ${details}` : '';
+
         if (code === 14) {
+            this.logError(`UNAVAILABLE from ${this.config.armadaUrl}.${suffix}`);
             this.updateConnectionState('error', `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`);
         } else if (code === 13) {
-            this.updateConnectionState('error', `Armada server returned an internal error.`);
+            this.logError(`INTERNAL error from ${this.config.armadaUrl}.${suffix}`);
+            this.updateConnectionState('error', `Armada server returned an internal error.${suffix}`);
         } else if (code === 16 || code === 7) {
-            this.updateConnectionState('auth-error', 'Authentication failed. Check your credentials.');
+            const authType = this.config.auth?.type ?? 'none';
+            const hint = authType === 'none'
+                ? ' No credentials are configured for this context — add basicAuth or execAuth to your armadactl config.'
+                : ` Credentials of type "${authType}" were sent but rejected.`;
+            this.logError(`${code === 16 ? 'UNAUTHENTICATED' : 'PERMISSION_DENIED'} from ${this.config.armadaUrl}.${suffix}${hint}`);
+            this.updateConnectionState('auth-error', `Authentication failed.${hint}${suffix}`);
+        } else if (code !== undefined) {
+            this.logError(`gRPC error code ${code} from ${this.config.armadaUrl}.${suffix}`);
         }
         // Application-level errors (5, 12, 2, etc.) do not change state
     }
@@ -117,7 +146,8 @@ export class ArmadaClient {
         const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
         const client = new binocularsProto.binoculars.Binoculars(
             binocularsUrl,
-            this.getCredentials(binocularsUrl)
+            this.getCredentials(binocularsUrl),
+            this.clientOptionsFor(binocularsUrl)
         );
 
         // Cache the client
@@ -169,7 +199,92 @@ export class ArmadaClient {
      * unless `forceNoTls` is set in the config.
      */
     private getCredentials(url: string): grpc.ChannelCredentials {
-        return selectCredentials(url, this.config.forceNoTls);
+        const channelCredentials = selectCredentials(url, this.config.forceNoTls);
+
+        // Attach the credentials from the armadactl config to every call on
+        // this channel. Without this the extension parses basicAuth/execAuth
+        // and then never sends it, so any server with anonymousAuth disabled
+        // answers 16 UNAUTHENTICATED.
+        if (!this.hasAuth()) {
+            return channelCredentials;
+        }
+
+        if (!isSecureCredentials(channelCredentials)) {
+            // gRPC refuses call credentials on a plaintext channel
+            // ("Cannot compose insecure credentials"), so these channels get
+            // the header from the interceptor in clientOptionsFor() instead.
+            this.logWarning(
+                `Sending credentials over an unencrypted connection to ${url}. ` +
+                'Credentials will be transmitted in plaintext.'
+            );
+            return channelCredentials;
+        }
+
+        return withCallCredentials(channelCredentials, () => this.getAuthHeader());
+    }
+
+    private hasAuth(): boolean {
+        return !!this.config.auth && this.config.auth.type !== 'none';
+    }
+
+    /**
+     * Client options for a given endpoint.
+     *
+     * Secure channels carry the auth header via call credentials (see
+     * `getCredentials`). Plaintext channels cannot — gRPC refuses to compose
+     * call credentials with insecure channel credentials — so they get an
+     * interceptor that sets the header on every outgoing call instead. Doing it
+     * as an interceptor rather than per call site covers unary and streaming
+     * methods alike.
+     */
+    private clientOptionsFor(url: string): grpc.ClientOptions {
+        if (!this.needsAuthInterceptor(url)) {
+            return {};
+        }
+        return {
+            interceptors: [
+                makeAuthInterceptor(
+                    () => this.getAuthHeader(),
+                    message => this.logError(message)
+                )
+            ]
+        };
+    }
+
+    /**
+     * True when auth is configured but the channel is plaintext, so the header
+     * has to be injected per call rather than by the channel credentials.
+     */
+    private needsAuthInterceptor(url: string): boolean {
+        return this.hasAuth() && !usesTls(url, this.config.forceNoTls);
+    }
+
+    /**
+     * Resolve the `authorization` header value, caching it for basic auth
+     * (which is static) while letting exec-based tokens be re-fetched.
+     */
+    private async getAuthHeader(): Promise<string | undefined> {
+        if (this.config.auth?.type === 'basic') {
+            if (this.cachedAuthHeader === undefined) {
+                this.cachedAuthHeader = await buildAuthHeader(this.config.auth);
+            }
+            return this.cachedAuthHeader;
+        }
+        return buildAuthHeader(this.config.auth);
+    }
+
+    private logWarning(message: string): void {
+        console.warn(`[Armada] ${message}`);
+        if (this.onLogMessage) {
+            this.onLogMessage(`WARNING: ${message}`);
+        }
+    }
+
+    private logError(message: string): void {
+        console.error(`[Armada] ${message}`);
+        if (this.onLogMessage) {
+            this.onLogMessage(`ERROR: ${message}`);
+        }
     }
 
     private initializeClients(): void {
@@ -178,6 +293,7 @@ export class ArmadaClient {
         }
 
         const credentials = this.getCredentials(this.config.armadaUrl);
+        const clientOptions = this.clientOptionsFor(this.config.armadaUrl);
         const armadaTarget = stripScheme(this.config.armadaUrl);
 
         // Set up proto include paths
@@ -197,7 +313,8 @@ export class ArmadaClient {
         const submitProto = grpc.loadPackageDefinition(submitPackageDefinition) as any;
         this.submitClient = new submitProto.api.Submit(
             armadaTarget,
-            credentials
+            credentials,
+            clientOptions
         );
 
         // Load Event service
@@ -206,7 +323,8 @@ export class ArmadaClient {
         const eventProto = grpc.loadPackageDefinition(eventPackageDefinition) as any;
         this.eventClient = new eventProto.api.Event(
             armadaTarget,
-            credentials
+            credentials,
+            clientOptions
         );
 
         // Load Jobs service (Query API)
@@ -215,7 +333,8 @@ export class ArmadaClient {
         const jobProto = grpc.loadPackageDefinition(jobPackageDefinition) as any;
         this.jobsClient = new jobProto.api.Jobs(
             armadaTarget,
-            credentials
+            credentials,
+            clientOptions
         );
 
         // Load Binoculars service (for logs)
@@ -229,7 +348,8 @@ export class ArmadaClient {
             const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
             this.binocularsClient = new binocularsProto.binoculars.Binoculars(
                 binocularsUrl,
-                this.getCredentials(binocularsUrl)
+                this.getCredentials(binocularsUrl),
+                this.clientOptionsFor(binocularsUrl)
             );
             console.log('[Armada] Binoculars client initialized at:', binocularsUrl);
             if (!this.config.binocularsUrl) {

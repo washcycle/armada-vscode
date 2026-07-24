@@ -4,6 +4,7 @@ import { JobTreeProvider } from '../providers/jobTreeProvider';
 import { LookoutClient } from '../api/lookoutClient';
 import { JobState } from '../types/armada';
 import { ResolvedConfig } from '../types/config';
+import { buildAuthHeader } from '../grpc/auth';
 
 const LOOKOUT_LOCALHOST_DEFAULT = 'http://localhost:30000';
 
@@ -24,7 +25,15 @@ export async function browseJobSetsCommand(
         } else if (lookoutUrl.startsWith('http://') && !lookoutUrl.includes('localhost') && !lookoutUrl.includes('127.0.0.1')) {
             console.warn('[Armada] lookoutUrl uses http:// without TLS. Consider using https:// for non-local clusters.');
         }
-        const lookoutClient = new LookoutClient({ lookoutUrl });
+        // LookoutClient has always supported an authHeader but nothing supplied
+        // one, so Lookout instances behind auth returned 401.
+        let authHeader: string | undefined;
+        try {
+            authHeader = await buildAuthHeader(config?.auth);
+        } catch (error: any) {
+            console.warn(`[Armada] Could not build Lookout auth header: ${error.message}`);
+        }
+        const lookoutClient = new LookoutClient({ lookoutUrl, authHeader });
 
         // Step 1: Select a queue
         const activeQueuesMap = await vscode.window.withProgress(

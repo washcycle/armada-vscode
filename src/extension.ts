@@ -152,6 +152,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const wireClientCallbacks = (client: ArmadaClient) => {
         client.onConnectionStateChange = () => updateStatusBar();
+        // Surface auth/connection diagnostics, which otherwise only reached the
+        // developer console and left users guessing at UNAUTHENTICATED errors.
+        client.onLogMessage = (message) => outputChannel.appendLine(`[Armada] ${message}`);
     };
 
     if (armadaClient) {
