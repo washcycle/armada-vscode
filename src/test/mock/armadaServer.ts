@@ -193,18 +193,27 @@ export class MockArmadaServer {
         callback(null, { job_errors: jobErrors });
     }
 
-    /** Start the server on a dynamic port. Returns the assigned port. */
-    async start(): Promise<number> {
+    /**
+     * Start the server on a dynamic port. Returns the assigned port.
+     *
+     * Passing a key/cert pair serves TLS instead of plaintext, which lets tests
+     * exercise certificate verification against a real handshake.
+     */
+    async start(tlsIdentity?: { key: Buffer; cert: Buffer }): Promise<number> {
+        const credentials = tlsIdentity
+            ? grpc.ServerCredentials.createSsl(
+                null,
+                [{ private_key: tlsIdentity.key, cert_chain: tlsIdentity.cert }],
+                false
+            )
+            : grpc.ServerCredentials.createInsecure();
+
         return new Promise((resolve, reject) => {
-            this.server.bindAsync(
-                '127.0.0.1:0',
-                grpc.ServerCredentials.createInsecure(),
-                (err, port) => {
-                    if (err) { reject(err); return; }
-                    this.port = port;
-                    resolve(port);
-                }
-            );
+            this.server.bindAsync('127.0.0.1:0', credentials, (err, port) => {
+                if (err) { reject(err); return; }
+                this.port = port;
+                resolve(port);
+            });
         });
     }
 

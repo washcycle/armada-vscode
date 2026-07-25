@@ -51,6 +51,7 @@ export function resolveArmadaConfig(config: ArmadaConfig): ResolvedConfig | null
             armadaUrl: context.armadaUrl,
             binocularsUrl: context.binocularsUrl,
             binocularsUrlPattern: context.binocularsUrlPattern,
+            caCertPath: context.caCertPath,
             currentContext: contextName,
             auth: extractAuth(context)
         };
@@ -60,6 +61,7 @@ export function resolveArmadaConfig(config: ArmadaConfig): ResolvedConfig | null
     if (config.armadaUrl) {
         return {
             armadaUrl: config.armadaUrl,
+            caCertPath: config.caCertPath,
             auth: extractAuth(config as any)
         };
     }

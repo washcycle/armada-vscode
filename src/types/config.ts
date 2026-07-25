@@ -23,6 +23,7 @@ export interface ArmadaContext {
     binocularsUrlPattern?: string; // Pattern with {CLUSTER_ID} placeholder
     lookoutUrl?: string; // Lookout v2 UI/API base URL, e.g. "https://lookout.armada.example.com"
     forceNoTls?: boolean; // When true, use insecure (plaintext) gRPC even if TLS is detected
+    caCertPath?: string; // PEM bundle of extra CAs to trust (corporate TLS proxies)
     openIdConnect?: OpenIdConnect;
     execAuth?: ExecAuth;
     basicAuth?: {
@@ -37,6 +38,7 @@ export interface ArmadaConfig {
     // Legacy format (direct config without contexts)
     armadaUrl?: string;
     forceNoTls?: boolean; // When true, use insecure (plaintext) gRPC even if TLS is detected
+    caCertPath?: string; // PEM bundle of extra CAs to trust (corporate TLS proxies)
     openIdConnect?: OpenIdConnect;
     execAuth?: ExecAuth;
 }
@@ -47,6 +49,7 @@ export interface ResolvedConfig {
     binocularsUrlPattern?: string; // Pattern with {CLUSTER_ID} placeholder
     lookoutUrl?: string; // Lookout v2 UI/API base URL
     forceNoTls?: boolean; // When true, use insecure (plaintext) gRPC even if TLS is detected
+    caCertPath?: string; // PEM bundle of extra CAs to trust (corporate TLS proxies)
     currentContext?: string;
     auth?: {
         type: 'oidc' | 'basic' | 'exec' | 'none';

@@ -1,9 +1,17 @@
 import * as https from 'https';
 import * as http from 'http';
+import { describeCertificateError } from '../grpc/caCerts';
 
 export interface LookoutConfig {
     lookoutUrl: string; // e.g., "https://lookout.armada.example.com"
     authHeader?: string; // Optional Bearer token or other auth header value
+    /**
+     * Extra CA certificates to trust, already merged with the system roots.
+     * Needed when a corporate TLS proxy re-signs HTTPS traffic.
+     */
+    caCerts?: Buffer;
+    /** The configured path, used only to make certificate errors actionable. */
+    caCertPath?: string;
 }
 
 export interface LookoutJob {
@@ -52,10 +60,21 @@ export interface LookoutJobsResponse {
 export class LookoutClient {
     private lookoutUrl: string;
     private authHeader?: string;
+    private httpsAgent?: https.Agent;
+    private caCertPath?: string;
 
     constructor(config: LookoutConfig) {
         this.lookoutUrl = config.lookoutUrl.replace(/\/$/, ''); // Remove trailing slash
         this.authHeader = config.authHeader;
+        if (config.caCerts) {
+            // `ca` replaces the default roots, so the caller passes a bundle
+            // that already includes them.
+            this.httpsAgent = new https.Agent({ ca: config.caCerts });
+            // Only remembered when the bundle actually loaded: a path with no
+            // certs behind it must not produce "your bundle is missing the
+            // signing CA" advice about a file that was never read.
+            this.caCertPath = config.caCertPath;
+        }
     }
 
     /**
@@ -168,13 +187,16 @@ export class LookoutClient {
                 headers['Authorization'] = this.authHeader;
             }
 
-            const options = {
+            const options: https.RequestOptions = {
                 hostname: urlObj.hostname,
                 port: urlObj.port || (isHttps ? 443 : 80),
                 path: urlObj.pathname + urlObj.search,
                 method: 'POST',
                 headers
             };
+            if (isHttps && this.httpsAgent) {
+                options.agent = this.httpsAgent;
+            }
 
             const req = client.request(options, (res) => {
                 let data = '';
@@ -198,7 +220,11 @@ export class LookoutClient {
             });
 
             req.on('error', (error) => {
-                reject(new Error(`HTTP request failed: ${error.message}`));
+                // Surface the CA-bundle remedy here too; a bare "HTTP request
+                // failed: unable to verify the first certificate" gives the user
+                // nothing to act on.
+                const certHint = describeCertificateError(error.message, this.caCertPath);
+                reject(new Error(`HTTP request failed: ${error.message}${certHint}`));
             });
 
             req.write(JSON.stringify(body));

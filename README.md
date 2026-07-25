@@ -100,6 +100,65 @@ Configure the extension in VSCode Settings (`File → Preferences → Settings �
 | `armada.autoRefresh` | `true` | Automatically refresh job status |
 | `armada.refreshInterval` | `5000` | Auto-refresh interval in milliseconds |
 | `armada.maxJobsToShow` | `100` | Maximum number of jobs to display |
+| `armada.caCertPath` | *(empty)* | PEM CA bundle to trust for TLS, in addition to the system roots. See [Corporate networks](#corporate-networks-and-tls-inspecting-proxies) |
+
+### Corporate networks and TLS-inspecting proxies
+
+On networks that run a TLS-inspecting proxy (Zscaler, Netskope, or an internal
+CA), the certificate the extension actually receives is re-signed by the proxy.
+Node.js does not ship that CA, so every connection fails — usually as
+`UNAVAILABLE` with a certificate error such as
+`unable to verify the first certificate` or `self signed certificate in certificate chain`.
+
+Point `armada.caCertPath` at your organisation's CA bundle:
+
+```jsonc
+// .vscode/settings.json, or your user settings
+{
+  "armada.caCertPath": "~/certs/corporate-ca.pem"
+}
+```
+
+The bundle is added to Node's built-in root certificates rather than replacing
+them, so publicly-signed endpoints keep working. A leading `~` is expanded.
+
+Both the gRPC connection to the Armada server and the HTTPS connection to
+Lookout use the bundle. Certificate problems are reported in the
+**Armada** output channel (`View → Output → Armada`), including how many extra
+certificates were loaded.
+
+**Getting a PEM bundle**
+
+The file must be PEM (`-----BEGIN CERTIFICATE-----` blocks); a DER-encoded
+`.crt` will be rejected with a conversion hint. Multiple certificates can be
+concatenated into one file, and you generally want the whole chain.
+
+```bash
+# macOS: export everything in the system keychain
+security export -t certs -f pemseq \
+  -k /Library/Keychains/System.keychain > ~/certs/corporate-ca.pem
+
+# Linux: the distro bundle usually already contains company CAs
+cp /etc/ssl/certs/ca-certificates.crt ~/certs/corporate-ca.pem
+
+# Convert a DER/.crt file your IT team gave you
+openssl x509 -inform der -in corporate-ca.crt -out ~/certs/corporate-ca.pem
+
+# Capture the chain a proxy presents for your Armada server
+openssl s_client -showcerts -connect armada.example.com:443 </dev/null \
+  2>/dev/null > ~/certs/corporate-ca.pem
+```
+
+A `caCertPath` set on the active `armadactl` context takes precedence over this
+setting, so per-cluster bundles are possible:
+
+```yaml
+currentContext: corp
+contexts:
+  corp:
+    armadaUrl: https://armada.example.com
+    caCertPath: ~/certs/corporate-ca.pem
+```
 
 ## Local Development Setup
 
