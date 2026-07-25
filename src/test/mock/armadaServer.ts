@@ -20,11 +20,17 @@ function loadProto(protoFile: string): grpc.GrpcObject {
     return grpc.loadPackageDefinition(def);
 }
 
+/** Jobs submitted to this namespace are rejected per item, for testing. */
+export const REJECT_NAMESPACE = 'reject-me';
+
 export class MockArmadaServer {
     private server: grpc.Server;
     private port: number = 0;
     /** Metadata from the most recent call, so tests can assert on auth headers. */
     private lastMetadata: grpc.Metadata | undefined;
+    /** The most recent SubmitJobs request, so tests can assert what went on the wire. */
+    private lastSubmitRequest: any;
+    private submitCallCount: number = 0;
 
     constructor() {
         this.server = new grpc.Server();
@@ -40,6 +46,30 @@ export class MockArmadaServer {
     /** Forget any recorded metadata, so a test starts from a known state. */
     resetLastMetadata(): void {
         this.lastMetadata = undefined;
+    }
+
+    /**
+     * The decoded SubmitJobs request from the most recent call.
+     *
+     * This is what actually crossed the wire, so assertions on it catch fields
+     * the client drops or mis-shapes during conversion.
+     */
+    getLastSubmitRequest(): any {
+        return this.lastSubmitRequest;
+    }
+
+    /** The first pod spec of the given job in the most recent submission. */
+    getSubmittedPodSpec(jobIndex = 0, specIndex = 0): any {
+        return this.lastSubmitRequest?.job_request_items?.[jobIndex]?.pod_specs?.[specIndex];
+    }
+
+    getSubmitCallCount(): number {
+        return this.submitCallCount;
+    }
+
+    resetSubmitCalls(): void {
+        this.lastSubmitRequest = undefined;
+        this.submitCallCount = 0;
     }
 
     private recordMetadata(call: any): void {
@@ -94,11 +124,21 @@ export class MockArmadaServer {
     // Submit handlers
     private handleSubmitJobs(call: any, callback: any): void {
         this.recordMetadata(call);
+        this.lastSubmitRequest = call.request;
+        this.submitCallCount += 1;
         const jobs: any[] = call.request.job_request_items || [];
-        const items = jobs.map(() => ({
-            job_id: crypto.randomUUID(),
-            error: ''
-        }));
+
+        // Reject items the way a real server does — per item, inside an
+        // otherwise successful call — so tests can cover partial failure.
+        const items = jobs.map((job: any) => {
+            if (!job.pod_specs || job.pod_specs.length === 0) {
+                return { job_id: '', error: 'Job must contain at least one PodSpec' };
+            }
+            if (job.namespace === REJECT_NAMESPACE) {
+                return { job_id: '', error: `namespace "${REJECT_NAMESPACE}" is not permitted for this user` };
+            }
+            return { job_id: crypto.randomUUID(), error: '' };
+        });
         callback(null, { job_response_items: items });
     }
 

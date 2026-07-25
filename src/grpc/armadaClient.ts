@@ -3,9 +3,11 @@ import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
 import * as tls from 'tls';
 import { ResolvedConfig } from '../types/config';
-import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult } from '../types/armada';
+import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult, RejectedJob } from '../types/armada';
+import * as protobuf from 'protobufjs';
 import { buildAuthHeader, isSecureCredentials, makeAuthInterceptor, withCallCredentials } from './auth';
 import { buildTrustStore, countCertificates, describeCertificateError, resolveCertPath } from './caCerts';
+import { ConversionReport, convertJobItem } from './podSpecConverter';
 
 /**
  * Strip any `http://` or `https://` scheme prefix from a URL so that the
@@ -49,6 +51,36 @@ export function selectCredentials(
         // Node's bundled root store, so without this the handshake fails.
         ? grpc.credentials.createSsl(rootCerts)
         : grpc.credentials.createInsecure();
+}
+
+/**
+ * Message descriptors used to convert YAML into the exact shape the vendored
+ * protos expect.
+ *
+ * @grpc/proto-loader exposes only serialize/deserialize for message types, not
+ * the protobufjs `Type` needed to walk fields, so the descriptors are loaded
+ * separately. Parsed once and cached: the k8s protos are large and the result is
+ * immutable.
+ */
+let submitTypes: { podSpec: protobuf.Type; jobItem: protobuf.Type } | undefined;
+
+export function getSubmitTypes(): { podSpec: protobuf.Type; jobItem: protobuf.Type } {
+    if (submitTypes) {
+        return submitTypes;
+    }
+    const protoRoot = path.join(__dirname, 'proto');
+    const root = new protobuf.Root();
+    // Resolve imports against the bundled proto tree, mirroring the
+    // `includeDirs` given to proto-loader.
+    root.resolvePath = (_origin, target) => path.resolve(protoRoot, target);
+    // keepCase matches the proto-loader options, so field names stay as the
+    // proto declares them (`priorityClassName`, not `priority_class_name`).
+    root.loadSync('pkg/api/submit.proto', { keepCase: true });
+    submitTypes = {
+        podSpec: root.lookupType('k8s.io.api.core.v1.PodSpec'),
+        jobItem: root.lookupType('api.JobSubmitRequestItem')
+    };
+    return submitTypes;
 }
 
 export class ArmadaClient {
@@ -440,7 +472,7 @@ export class ArmadaClient {
     async submitJobs(jobSpec: ArmadaJobSpec): Promise<SubmitJobResponse> {
         this.initializeClients();
         return new Promise((resolve, reject) => {
-            const jobRequestItems = jobSpec.jobs.map(job => this.convertJobToProto(job));
+            const jobRequestItems = jobSpec.jobs.map((job, index) => this.convertJobToProto(job, index));
 
             // Debug logging
             console.log('[Armada] Submitting jobs:', JSON.stringify({
@@ -466,9 +498,34 @@ export class ArmadaClient {
 
                 this.updateConnectionState('connected');
                 console.log('[Armada] Submit successful:', response);
-                resolve({
-                    jobIds: response.job_response_items || []
+
+                // The server reports per-item failures inside a successful call,
+                // so a response is not proof every job was accepted.
+                const items: any[] = response.job_response_items || [];
+                const jobIds: string[] = [];
+                const rejected: RejectedJob[] = [];
+
+                items.forEach((item, index) => {
+                    const error = typeof item?.error === 'string' ? item.error.trim() : '';
+                    if (error) {
+                        rejected.push({ index, error });
+                        return;
+                    }
+                    const jobId = item?.job_id || item?.jobId;
+                    if (jobId) {
+                        jobIds.push(String(jobId));
+                    } else {
+                        // Neither an id nor a reason: still a failure, and
+                        // reporting it beats inventing a job that does not exist.
+                        rejected.push({ index, error: 'server returned no job id' });
+                    }
                 });
+
+                for (const failure of rejected) {
+                    this.logError(`Armada rejected jobs[${failure.index}]: ${failure.error}`);
+                }
+
+                resolve({ jobIds, rejected });
             });
         });
     }
@@ -681,93 +738,26 @@ export class ArmadaClient {
     /**
      * Convert job spec to protobuf format
      */
-    private convertJobToProto(job: any): any {
-        console.log('[Armada] Converting job to proto:', JSON.stringify(job, null, 2));
+    private convertJobToProto(job: any, jobIndex = 0): any {
+        const report: ConversionReport = { unknownFields: [] };
+        const { podSpec, jobItem } = getSubmitTypes();
 
-        // Convert podSpecs to Kubernetes PodSpec format
-        const podSpecs = job.podSpecs ? job.podSpecs.map((spec: any) => {
-            console.log('[Armada] Processing podSpec:', JSON.stringify(spec, null, 2));
+        // Walks the descriptor rather than an allowlist, and accepts both the
+        // singular `podSpec:` and the plural `podSpecs:` forms. Reading only the
+        // plural made most real job files — and this extension's own README
+        // example — submit an empty pod_specs, which the server rejects with
+        // "Job must contain at least one PodSpec".
+        const result = convertJobItem(job, jobItem, podSpec, report, `jobs[${jobIndex}]`);
 
-            // Convert containers with proper resource format
-            const containers = (spec.containers || []).map((container: any) => {
-                const convertedContainer: any = {
-                    name: container.name,
-                    image: container.image,
-                    command: container.command,
-                    args: container.args,
-                    imagePullPolicy: container.imagePullPolicy
-                };
+        // A typo'd or unsupported key would otherwise vanish without trace: the
+        // job submits and then behaves differently than the file describes.
+        if (report.unknownFields.length > 0) {
+            this.logWarning(
+                `Ignoring ${report.unknownFields.length} unrecognized field(s) in the job file: ` +
+                `${report.unknownFields.join(', ')}. Check for typos — these are not sent to Armada.`
+            );
+        }
 
-                // Convert resources to Kubernetes Quantity format
-                if (container.resources) {
-                    convertedContainer.resources = {};
-
-                    if (container.resources.limits) {
-                        convertedContainer.resources.limits = {};
-                        for (const [key, value] of Object.entries(container.resources.limits)) {
-                            convertedContainer.resources.limits[key] = { string: String(value) };
-                        }
-                    }
-
-                    if (container.resources.requests) {
-                        convertedContainer.resources.requests = {};
-                        for (const [key, value] of Object.entries(container.resources.requests)) {
-                            convertedContainer.resources.requests[key] = { string: String(value) };
-                        }
-                    }
-                }
-
-                // Add other optional container fields
-                if (container.env) convertedContainer.env = container.env;
-                if (container.volumeMounts) convertedContainer.volumeMounts = container.volumeMounts;
-                if (container.ports) convertedContainer.ports = container.ports;
-                if (container.securityContext) convertedContainer.securityContext = container.securityContext;
-
-                return convertedContainer;
-            });
-
-            const podSpec: any = {
-                containers: containers,
-                restartPolicy: spec.restartPolicy || 'Never'
-            };
-
-            // Add optional fields if present
-            if (spec.terminationGracePeriodSeconds !== undefined) {
-                podSpec.terminationGracePeriodSeconds = spec.terminationGracePeriodSeconds;
-            }
-            if (spec.activeDeadlineSeconds !== undefined) {
-                podSpec.activeDeadlineSeconds = spec.activeDeadlineSeconds;
-            }
-            if (spec.nodeSelector) {
-                podSpec.nodeSelector = spec.nodeSelector;
-            }
-            if (spec.tolerations) {
-                podSpec.tolerations = spec.tolerations;
-            }
-            if (spec.affinity) {
-                podSpec.affinity = spec.affinity;
-            }
-            if (spec.volumes) {
-                podSpec.volumes = spec.volumes;
-            }
-            if (spec.imagePullSecrets) {
-                podSpec.imagePullSecrets = spec.imagePullSecrets;
-            }
-
-            console.log('[Armada] Converted podSpec:', JSON.stringify(podSpec, null, 2));
-            return podSpec;
-        }) : [];
-
-        const result = {
-            priority: job.priority || 0,
-            namespace: job.namespace || 'default',
-            client_id: job.clientId || '',
-            labels: job.labels || {},
-            annotations: job.annotations || {},
-            pod_specs: podSpecs
-        };
-
-        console.log('[Armada] Final proto job:', JSON.stringify(result, null, 2));
         return result;
     }
 
