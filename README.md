@@ -64,6 +64,14 @@ contexts:
 
 3. Click the cloud upload icon in the editor or run `Armada: Submit Job`
 
+Each job needs a pod spec with at least one container. Both spellings
+`armadactl` accepts work: `podSpec:` for a single spec, or `podSpecs:` as a list
+for a gang. The pod spec is a standard Kubernetes `PodSpec`, so fields such as
+`priorityClassName`, `securityContext`, `initContainers`, `volumes`,
+`tolerations` and `imagePullSecrets` are all forwarded as written. Any key that
+is not part of `PodSpec` is reported in the **Armada** output channel rather than
+ignored, which catches typos like `imagePullPolcy`.
+
 ### 3. Monitor Jobs
 
 - Open the Armada sidebar (activity bar icon)

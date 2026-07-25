@@ -38,6 +38,9 @@ export const vscodeMock = {
         showErrorMessage: async () => undefined,
         showWarningMessage: async () => undefined,
         showQuickPick: async () => undefined,
+        activeTextEditor: undefined as unknown,
+        withProgress: async (_options: unknown, task: (progress: unknown) => Promise<unknown>) =>
+            task({ report: () => undefined }),
     },
     workspace: {
         getConfiguration: () => ({ get: (_key: string, defaultVal?: unknown) => defaultVal }),

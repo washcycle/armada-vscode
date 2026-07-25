@@ -107,8 +107,25 @@ export interface ConnectionTestResult {
  * gRPC response types
  */
 
+/** A job the server refused, with its reason. */
+export interface RejectedJob {
+    /** Index of the job in the submitted file, for pointing the user at it. */
+    index: number;
+    error: string;
+}
+
 export interface SubmitJobResponse {
+    /** Ids of the jobs the server accepted. */
     jobIds: string[];
+    /**
+     * Jobs the server rejected individually.
+     *
+     * SubmitJobs can accept some items and reject others, reporting the reason
+     * per item rather than as a call-level error. These used to be ignored, so a
+     * rejected job was counted as a success and pushed into the tree as the
+     * string "[object Object]".
+     */
+    rejected: RejectedJob[];
 }
 
 export interface JobEventMessage {
