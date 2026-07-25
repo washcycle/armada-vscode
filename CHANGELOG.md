@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.5.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.4.0...armada-vscode-v0.5.0) (2026-07-25)
+
+
+### Features
+
+* trust extra CA certificates via armada.caCertPath ([#70](https://github.com/washcycle/armada-vscode/issues/70)) ([82014d0](https://github.com/washcycle/armada-vscode/commit/82014d0e30b9781968668f7a33d39cc272cb6bb4))
+
+
+### Bug Fixes
+
+* **build:** unbreak CI under typescript 6 ([#67](https://github.com/washcycle/armada-vscode/issues/67)) ([6e27143](https://github.com/washcycle/armada-vscode/commit/6e27143d8de1ce62fc804e05850fe804e94543dc))
+* send configured credentials on gRPC and Lookout requests ([#66](https://github.com/washcycle/armada-vscode/issues/66)) ([61074b2](https://github.com/washcycle/armada-vscode/commit/61074b22f171c335d16f5729f5357ecf23850376))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @types/glob from 8.1.0 to 9.0.0 ([#62](https://github.com/washcycle/armada-vscode/issues/62)) ([34b985a](https://github.com/washcycle/armada-vscode/commit/34b985a0a3749c8997e4979e9ea4a8781034e822))
+* **deps-dev:** bump eslint from 9.39.2 to 10.1.0 ([#61](https://github.com/washcycle/armada-vscode/issues/61)) ([487483b](https://github.com/washcycle/armada-vscode/commit/487483bec203886528ada095ba0b6599f9e89c67))
+* **deps-dev:** bump typescript from 5.9.3 to 6.0.2 ([#60](https://github.com/washcycle/armada-vscode/issues/60)) ([dad5763](https://github.com/washcycle/armada-vscode/commit/dad5763ef76eb6ed7e2afe89284df0176bd7bcae))
+* **deps:** bump picomatch in the npm_and_yarn group across 1 directory ([#65](https://github.com/washcycle/armada-vscode/issues/65)) ([b9d61fe](https://github.com/washcycle/armada-vscode/commit/b9d61fe252d4012ad171270394813fdd3b126965))
+* **deps:** bump the npm_and_yarn group across 1 directory with 4 updates ([#69](https://github.com/washcycle/armada-vscode/issues/69)) ([4ecb6f2](https://github.com/washcycle/armada-vscode/commit/4ecb6f242c5f286a8e367887650501133829f2d7))
+
+
+### Tests
+
+* unit and package all succeed. ([6e27143](https://github.com/washcycle/armada-vscode/commit/6e27143d8de1ce62fc804e05850fe804e94543dc))
+
 ## [0.4.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.3.0...armada-vscode-v0.4.0) (2026-03-20)
 
 
