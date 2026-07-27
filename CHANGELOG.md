@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.0...armada-vscode-v0.5.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **submit:** accept podSpec and stop dropping job fields silently ([102317d](https://github.com/washcycle/armada-vscode/commit/102317d6e7d3f53925e795e5d7604ba5dcc7973f))
+
 ## [0.5.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.4.0...armada-vscode-v0.5.0) (2026-07-25)
 
 
