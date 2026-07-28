@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.2...armada-vscode-v0.5.3) (2026-07-28)
+
+
+### Bug Fixes
+
+* **panel:** decode protobuf Timestamp and Quantity in job details ([b3b0110](https://github.com/washcycle/armada-vscode/commit/b3b011049dfc7b15d5faaaee5d6e69bed2295d55))
+
 ## [0.5.2](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.1...armada-vscode-v0.5.2) (2026-07-28)
 
 
