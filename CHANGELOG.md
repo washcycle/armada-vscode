@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.1...armada-vscode-v0.5.2) (2026-07-28)
+
+
+### Bug Fixes
+
+* **grpc:** stop deriving a bogus Binoculars port for TLS endpoints ([9a8202f](https://github.com/washcycle/armada-vscode/commit/9a8202f8fcdb904ee0a94dc77c880e5e682dbbfa))
+
 ## [0.5.1](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.0...armada-vscode-v0.5.1) (2026-07-27)
 
 
