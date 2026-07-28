@@ -35,6 +35,53 @@ export function usesTls(url: string, forceNoTls?: boolean): boolean {
 }
 
 /**
+ * Guess the Binoculars endpoint from the Armada endpoint.
+ *
+ * The `+2` offset comes from the quickstart's NodePort layout, where every
+ * service gets its own port on a single host:
+ *   localhost:30002            -> localhost:30004
+ *   armada.example.com:50051   -> armada.example.com:50053
+ *
+ * That relationship does not exist behind a TLS reverse proxy or ingress, where
+ * all services are fronted on 443 and separated by hostname instead. Deriving
+ * there produces port 445 (SMB), and the log request fails with ECONNREFUSED —
+ * which reads as "Binoculars is down" when in truth it was never configured.
+ * The same applies to any explicit `https://` endpoint.
+ *
+ * Returns `{url: null, reason}` instead of guessing in those cases, so the
+ * caller can tell the user which setting is missing.
+ */
+export function deriveBinocularsUrl(armadaUrl: string): { url: string | null; reason: string } {
+    const urlMatch = armadaUrl.match(/^(?:(https?):\/\/)?([^:/]+)(?::(\d+))?$/);
+    if (!urlMatch) {
+        return { url: null, reason: `Could not parse the Armada URL "${armadaUrl}" to derive a Binoculars URL.` };
+    }
+
+    const [, scheme, host, portText] = urlMatch;
+    const port = portText ? parseInt(portText, 10) : null;
+
+    if (scheme === 'https' || port === 443) {
+        return {
+            url: null,
+            reason: `Cannot infer a Binoculars URL from the TLS endpoint "${armadaUrl}", because ` +
+                'services behind an ingress share one port and differ only by hostname. ' +
+                'Set binocularsUrl (or binocularsUrlPattern for multi-cluster setups) in your ' +
+                'armadactl config to view job logs.'
+        };
+    }
+
+    if (!port) {
+        return {
+            url: null,
+            reason: `The Armada URL "${armadaUrl}" has no port, so a Binoculars URL cannot be derived. ` +
+                'Set binocularsUrl in your armadactl config to view job logs.'
+        };
+    }
+
+    return { url: `${host}:${port + 2}`, reason: '' };
+}
+
+/**
  * Select gRPC channel credentials for a given endpoint URL.
  * Returns SSL credentials when the URL uses an `https://` scheme or targets
  * port 443.  Passing `forceNoTls: true` always returns insecure credentials
@@ -89,6 +136,8 @@ export class ArmadaClient {
     private jobsClient: any;
     private binocularsClient: any; // Default Binoculars client (no cluster ID)
     private binocularsClients: Map<string, any> = new Map(); // Cluster-specific Binoculars clients
+    /** Why the Binoculars URL could not be determined, surfaced by getLogs. */
+    private binocularsUrlError: string | undefined;
     private config: ResolvedConfig;
     private initialized: boolean = false;
     private cachedAuthHeader: string | undefined;
@@ -210,39 +259,20 @@ export class ArmadaClient {
     }
 
     /**
-     * Derive Binoculars URL from Armada URL
-     * Pattern: If Armada is on port X, Binoculars gRPC is typically on port X+2
-     * Examples:
-     *   localhost:30002 -> localhost:30004
-     *   armada.example.com:50051 -> armada.example.com:50053
+     * Derive a Binoculars URL from the Armada URL, logging the reason on failure.
+     * See the module-level `deriveBinocularsUrl` for why derivation is not
+     * always possible.
      */
     private deriveBinocularsUrl(armadaUrl: string): string | null {
-        try {
-            // Parse the URL
-            const urlMatch = armadaUrl.match(/^(?:https?:\/\/)?([^:]+)(?::(\d+))?$/);
-            if (!urlMatch) {
-                console.log('[Armada] Could not parse Armada URL for Binoculars derivation:', armadaUrl);
-                return null;
-            }
-
-            const host = urlMatch[1];
-            const port = urlMatch[2] ? parseInt(urlMatch[2]) : null;
-
-            if (!port) {
-                console.log('[Armada] Armada URL has no port, cannot derive Binoculars URL');
-                return null;
-            }
-
-            // Binoculars gRPC port is typically Armada gRPC port + 2
-            const binocularsPort = port + 2;
-            const binocularsUrl = `${host}:${binocularsPort}`;
-
-            console.log('[Armada] Derived Binoculars URL:', binocularsUrl);
-            return binocularsUrl;
-        } catch (error) {
-            console.error('[Armada] Error deriving Binoculars URL:', error);
+        const derived = deriveBinocularsUrl(armadaUrl);
+        if (derived.url === null) {
+            // Kept so getLogs can report why, instead of blaming Binoculars.
+            this.binocularsUrlError = derived.reason;
+            this.logWarning(derived.reason);
             return null;
         }
+        console.log('[Armada] Derived Binoculars URL:', derived.url);
+        return derived.url;
     }
 
     /**
@@ -991,7 +1021,10 @@ export class ArmadaClient {
         const binocularsClient = this.getBinocularsClientForCluster(clusterId);
 
         if (!binocularsClient) {
-            throw new Error(`Could not create Binoculars client for cluster "${clusterId}". Check your configuration.`);
+            throw new Error(
+                this.binocularsUrlError
+                    ?? `Could not create Binoculars client for cluster "${clusterId}". Check your configuration.`
+            );
         }
 
         return new Promise((resolve, reject) => {
