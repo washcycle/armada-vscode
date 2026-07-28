@@ -78,8 +78,8 @@ export class JobDetailPanel {
         const jobSpec = details?.job_spec ?? details?.jobSpec;
 
         // Explicit allow-list of fields to render — no object spreading
-        const submittedTs = details?.submitted_ts ?? details?.submittedTs;
-        const lastTransitionTs = details?.last_transition_ts ?? details?.lastTransitionTs;
+        const submittedTs = formatTimestamp(details?.submitted_ts ?? details?.submittedTs);
+        const lastTransitionTs = formatTimestamp(details?.last_transition_ts ?? details?.lastTransitionTs);
         const owner = details?.owner;
 
         const runsHtml = runs.length > 0 ? `
@@ -92,8 +92,8 @@ export class JobDetailPanel {
                     ${runs.map((run: any, i: number) => {
                         const cluster = esc(run.cluster ?? run.clusterId ?? '—');
                         const node = esc(run.node ?? '—');
-                        const started = esc(run.started_ts ?? run.startedTs ?? run.started ?? '—');
-                        const finished = esc(run.finished_ts ?? run.finishedTs ?? run.finished ?? '—');
+                        const started = esc(formatTimestamp(run.started_ts ?? run.startedTs ?? run.started) ?? '—');
+                        const finished = esc(formatTimestamp(run.finished_ts ?? run.finishedTs ?? run.finished) ?? '—');
                         const exitCode = run.exit_code ?? run.exitCode;
                         const exitCodeStr = exitCode !== undefined ? String(exitCode) : '—';
                         const exitStyle = exitCode !== undefined && exitCode !== 0
@@ -115,9 +115,9 @@ export class JobDetailPanel {
         const resourcesHtml = jobSpec ? (() => {
             const reqs = jobSpec.scheduling_resource_requirements ?? jobSpec.schedulingResourceRequirements;
             if (!reqs) { return ''; }
-            const cpu = esc(reqs.cpu ?? reqs.CPU ?? '—');
-            const memory = esc(reqs.memory ?? reqs.Memory ?? '—');
-            const gpu = esc(reqs.gpu ?? reqs['nvidia.com/gpu'] ?? '—');
+            const cpu = esc(formatQuantity(reqs.cpu ?? reqs.CPU) ?? '—');
+            const memory = esc(formatQuantity(reqs.memory ?? reqs.Memory) ?? '—');
+            const gpu = esc(formatQuantity(reqs.gpu ?? reqs['nvidia.com/gpu']) ?? '—');
             return `
                 <h3>Resource Requests</h3>
                 <table>
@@ -145,8 +145,8 @@ export class JobDetailPanel {
             <table>
                 <tr><th>Current State</th><td>${esc(jobInfo.state)}</td></tr>
                 ${jobInfo.failureReason ? `<tr><th>Failure Reason</th><td style="color: var(--vscode-errorForeground);">${esc(jobInfo.failureReason)}</td></tr>` : ''}
-                ${submittedTs ? `<tr><th>Submitted</th><td>${esc(String(submittedTs))}</td></tr>` : ''}
-                ${lastTransitionTs ? `<tr><th>Last Transition</th><td>${esc(String(lastTransitionTs))}</td></tr>` : ''}
+                ${submittedTs ? `<tr><th>Submitted</th><td>${esc(submittedTs)}</td></tr>` : ''}
+                ${lastTransitionTs ? `<tr><th>Last Transition</th><td>${esc(lastTransitionTs)}</td></tr>` : ''}
             </table>
 
             ${resourcesHtml}
@@ -184,6 +184,77 @@ export class JobDetailPanel {
 </body>
 </html>`;
     }
+}
+
+/**
+ * Format a protobuf Timestamp for display.
+ *
+ * The gRPC clients load protos with `longs: String`, so a
+ * `google.protobuf.Timestamp` arrives as `{seconds: "1785...", nanos: 0}` —
+ * interpolating that straight into HTML renders "[object Object]". Lookout's
+ * REST API returns the same instants as ISO strings, so both shapes reach here.
+ *
+ * Returns undefined when there is no usable value, so callers can omit the row.
+ */
+export function formatTimestamp(ts: unknown): string | undefined {
+    if (ts === null || ts === undefined || ts === '') { return undefined; }
+
+    // Already a string: an ISO date from Lookout, or a stringified epoch.
+    if (typeof ts === 'string') {
+        const asNumber = Number(ts);
+        if (Number.isFinite(asNumber) && ts.trim() !== '') {
+            return fromEpochSeconds(asNumber);
+        }
+        const parsed = Date.parse(ts);
+        return Number.isNaN(parsed) ? ts : new Date(parsed).toISOString();
+    }
+
+    if (typeof ts === 'number') { return fromEpochSeconds(ts); }
+
+    if (ts instanceof Date) {
+        return Number.isNaN(ts.getTime()) ? undefined : ts.toISOString();
+    }
+
+    if (typeof ts === 'object') {
+        const obj = ts as Record<string, unknown>;
+        // protobuf Timestamp: {seconds, nanos}. Either may be string or number,
+        // and `defaults: true` means a zero-value timestamp still has both keys.
+        if ('seconds' in obj || 'nanos' in obj) {
+            const seconds = Number(obj.seconds ?? 0);
+            const nanos = Number(obj.nanos ?? 0);
+            if (!Number.isFinite(seconds) || !Number.isFinite(nanos)) { return undefined; }
+            // A genuinely unset timestamp is the epoch; showing 1970 is noise.
+            if (seconds === 0 && nanos === 0) { return undefined; }
+            return fromEpochSeconds(seconds + nanos / 1e9);
+        }
+    }
+
+    return undefined;
+}
+
+/** Convert epoch seconds to an ISO string, rejecting values Date cannot represent. */
+function fromEpochSeconds(seconds: number): string | undefined {
+    const date = new Date(seconds * 1000);
+    return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+/**
+ * Format a k8s `resource.Quantity` for display.
+ *
+ * The generated proto models Quantity as `{string: "900m"}` (a message with a
+ * single `string` field), so interpolating it renders "[object Object]".
+ * Lookout's REST API sends plain strings/numbers for the same values.
+ */
+export function formatQuantity(q: unknown): string | undefined {
+    if (q === null || q === undefined || q === '') { return undefined; }
+    if (typeof q === 'string') { return q; }
+    if (typeof q === 'number') { return String(q); }
+    if (typeof q === 'object') {
+        const inner = (q as Record<string, unknown>).string;
+        if (typeof inner === 'string' && inner !== '') { return inner; }
+        if (typeof inner === 'number') { return String(inner); }
+    }
+    return undefined;
 }
 
 /** HTML-escape a string to prevent XSS in webview content */
