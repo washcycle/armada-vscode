@@ -11,8 +11,8 @@
  * modules that transitively depend on `vscode`.
  */
 
-/* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable @typescript-eslint/no-var-requires */
+ 
+ 
 
 import * as assert from 'assert';
 import { JobInfo, JobState } from '../../../types/armada';

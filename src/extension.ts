@@ -21,9 +21,7 @@ import { cancelJobSetCommand } from './commands/cancelJobSet';
 import { reprioritizeJobCommand } from './commands/reprioritizeJob';
 import { JobDetailPanel } from './panels/jobDetailPanel';
 import { ConfigPanel } from './panels/configPanel';
-import { buildJobCountLabel } from './util/jobCountLabel';
-
-export { buildJobCountLabel };
+import { buildJobCountLabel, buildJobCountTooltip, shouldShowJobCounts } from './util/jobCountLabel';
 
 export async function activate(context: vscode.ExtensionContext) {
     console.log('Armada extension is now active');
@@ -131,22 +129,16 @@ export async function activate(context: vscode.ExtensionContext) {
     // jobCountsBarItem.command = { command: 'armada.filterByState', arguments: ['FAILED'], title: 'Filter by Failed' };
 
     const updateJobCountsBar = () => {
-        const showCounts = vscode.workspace.getConfiguration('armada').get('statusBar.showJobCounts', true);
-        if (!showCounts) {
+        const config = configManager.getCurrentConfig();
+        const settingEnabled = vscode.workspace.getConfiguration('armada').get<boolean>('statusBar.showJobCounts', true);
+        if (!shouldShowJobCounts(!!config, settingEnabled)) {
             jobCountsBarItem.hide();
             return;
         }
 
         const counts = jobTreeProvider.getJobCounts();
         jobCountsBarItem.text = buildJobCountLabel(counts);
-
-        const config = configManager.getCurrentConfig();
-        const ctx = config?.currentContext || 'default';
-        const running = counts['RUNNING'] ?? 0;
-        const failed = counts['FAILED'] ?? 0;
-        const queued = (counts['QUEUED'] ?? 0) + (counts['PENDING'] ?? 0);
-        jobCountsBarItem.tooltip = `Armada [${ctx}]: ${running} running, ${failed} failed, ${queued} queued`;
-
+        jobCountsBarItem.tooltip = buildJobCountTooltip(config?.currentContext || 'default', counts);
         jobCountsBarItem.show();
     };
 
@@ -164,6 +156,16 @@ export async function activate(context: vscode.ExtensionContext) {
     // Update job counts bar after every tree data change (i.e., every refresh)
     context.subscriptions.push(
         jobTreeProvider.onDidChangeTreeData(() => updateJobCountsBar())
+    );
+
+    // Apply the showJobCounts setting immediately rather than on the next refresh
+    // (which never comes when armada.autoRefresh is disabled).
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('armada.statusBar.showJobCounts')) {
+                updateJobCountsBar();
+            }
+        })
     );
 
     // Register commands
