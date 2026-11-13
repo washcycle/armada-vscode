@@ -147,7 +147,7 @@ describe('ConfigPanel webview (Playwright)', function () {
             assert.match(r.text, /^✗ /);
         });
 
-        knownBug('armada-vscode-6ts', 'trailing slash URL connects from the panel', async () => {
+        it('trailing slash URL connects from the panel', async () => {
             const { page } = await mount(cfg(`http://localhost:${plain.armadaPort}/`));
             const r = await clickTest(page);
             assert.strictEqual(r.cls, 'ok', r.text);
@@ -241,8 +241,16 @@ describe('ConfigPanel webview (Playwright)', function () {
             assert.match((await page.textContent('body')) ?? '', /No Armada configuration found/);
         });
 
-        knownBug('armada-vscode-qno', 'no script errors when there is no config', async () => {
+        // Regression test for armada-vscode-qno.
+        it('runs without script errors when there is no config', async () => {
             const { page, errors } = await mount(null, false);
+            await page.waitForTimeout(200);
+            assert.deepStrictEqual(errors, []);
+        });
+
+        it('ignores a stray testResult message when there are no Test Connection controls', async () => {
+            const { page, panel, errors } = await mount(null, false);
+            await panel.webview.postMessage({ command: 'testResult', ok: false, message: 'late result' });
             await page.waitForTimeout(200);
             assert.deepStrictEqual(errors, []);
         });
