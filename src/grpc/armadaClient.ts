@@ -8,6 +8,7 @@ import * as protobuf from 'protobufjs';
 import { buildAuthHeader, isSecureCredentials, makeAuthInterceptor, withCallCredentials } from './auth';
 import { buildTrustStore, countCertificates, describeCertificateError, resolveCertPath } from './caCerts';
 import { ConversionReport, convertJobItem } from './podSpecConverter';
+import { CONNECTION_TEST_TIMEOUT_MS, DEADLINE_EXCEEDED, DEFAULT_UNARY_TIMEOUT_MS, describeTimeout, makeDeadlineInterceptor } from './deadline';
 
 /**
  * Strip any `http://` or `https://` scheme prefix from a URL so that the
@@ -161,7 +162,7 @@ export class ArmadaClient {
         }
     }
 
-    private classifyGrpcError(error: any): void {
+    private classifyGrpcError(error: any, timeoutMs: number = DEFAULT_UNARY_TIMEOUT_MS): void {
         const code: number | undefined = error?.code;
         // The server's own explanation is the most useful part of the error and
         // used to be dropped entirely, which made misconfigurations undebuggable.
@@ -180,6 +181,10 @@ export class ArmadaClient {
                     ? `TLS certificate verification failed for ${this.config.armadaUrl}.${certHint}`
                     : `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`
             );
+        } else if (code === DEADLINE_EXCEEDED) {
+            const message = describeTimeout(this.config.armadaUrl, timeoutMs);
+            this.logError(`DEADLINE_EXCEEDED from ${this.config.armadaUrl}.${suffix}`);
+            this.updateConnectionState('error', message);
         } else if (code === 13) {
             this.logError(`INTERNAL error from ${this.config.armadaUrl}.${suffix}`);
             this.updateConnectionState('error', `Armada server returned an internal error.${suffix}`);
@@ -365,17 +370,18 @@ export class ArmadaClient {
      * methods alike.
      */
     private clientOptionsFor(url: string): grpc.ClientOptions {
-        if (!this.needsAuthInterceptor(url)) {
-            return {};
-        }
-        return {
-            interceptors: [
+        // Every channel gets a default deadline for unary calls (streams are
+        // exempt), so a firewalled host fails instead of hanging forever.
+        const interceptors: grpc.Interceptor[] = [makeDeadlineInterceptor(DEFAULT_UNARY_TIMEOUT_MS)];
+        if (this.needsAuthInterceptor(url)) {
+            interceptors.push(
                 makeAuthInterceptor(
                     () => this.getAuthHeader(),
                     message => this.logError(message)
                 )
-            ]
-        };
+            );
+        }
+        return { interceptors };
     }
 
     /**
@@ -1088,12 +1094,14 @@ export class ArmadaClient {
     async testConnection(): Promise<ConnectionTestResult> {
         this.initializeClients();
         return new Promise((resolve) => {
-            this.jobsClient.GetActiveQueues({}, (error: any, response: any) => {
+            const deadline = Date.now() + CONNECTION_TEST_TIMEOUT_MS;
+            this.jobsClient.GetActiveQueues({}, { deadline }, (error: any, response: any) => {
                 if (error) {
                     const code: number | undefined = error?.code;
-                    this.classifyGrpcError(error);
+                    this.classifyGrpcError(error, CONNECTION_TEST_TIMEOUT_MS);
 
                     const messageMap: Record<number, string> = {
+                        [DEADLINE_EXCEEDED]: describeTimeout(this.config.armadaUrl, CONNECTION_TEST_TIMEOUT_MS),
                         13: `Internal server error. The server at ${this.config.armadaUrl} returned an unexpected error.`,
                         14: `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`,
                         16: 'Authentication failed. Check your credentials.',

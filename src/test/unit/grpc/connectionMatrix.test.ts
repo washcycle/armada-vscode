@@ -119,10 +119,17 @@ describe('Connection matrix (real gRPC, non-default ports)', function () {
         before(async () => { silent = await startSilentTcp(); });
         after(() => silent.stop());
 
-        knownBug('armada-vscode-1eb', 'testConnection settles within 10s when the server never responds', async () => {
-            const result = await quiet(() => within(client({ armadaUrl: `127.0.0.1:${silent.port}` }).testConnection(), 10000, 'testConnection'));
+        // Regression test for armada-vscode-1eb: testConnection has a 10s deadline.
+        it('testConnection times out with a clear message when the server never responds', async function () {
+            this.timeout(20000);
+            const started = Date.now();
+            const result = await quiet(() => within(client({ armadaUrl: `127.0.0.1:${silent.port}` }).testConnection(), 15000, 'testConnection'));
+            const elapsed = Date.now() - started;
             assert.strictEqual(result.ok, false);
-        }, 15000);
+            assert.strictEqual(result.code, 4, 'DEADLINE_EXCEEDED');
+            assert.match(result.message ?? '', /Timed out after 10s/);
+            assert.ok(elapsed >= 9000 && elapsed < 14000, `settled after ${elapsed}ms`);
+        });
     });
 
     describe('TLS credential selection (armadactl parity)', () => {

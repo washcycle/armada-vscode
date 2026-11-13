@@ -159,11 +159,16 @@ describe('ConfigPanel webview (Playwright)', function () {
         before(async () => { silent = await startSilentTcp(); });
         after(() => silent?.stop());
 
-        knownBug('armada-vscode-1eb', 'spinner settles within 12s when the server never responds', async () => {
+        // Regression test for armada-vscode-1eb.
+        it('spinner settles with a timeout message when the server never responds', async function () {
+            this.timeout(25000);
             const { page } = await mount(cfg(`127.0.0.1:${silent.port}`));
-            const r = await clickTest(page, 12000);
+            const r = await clickTest(page, 15000);
             assert.strictEqual(r.cls, 'err');
-        }, 20000);
+            assert.match(r.text, /Timed out after 10s/);
+            assert.strictEqual(await page.isDisabled('#testBtn'), false, 'button re-enabled');
+            assert.strictEqual(await page.isVisible('#spinner'), false, 'spinner hidden');
+        });
     });
 
     describe('rendering and escaping', () => {
