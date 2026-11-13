@@ -8,6 +8,7 @@ import { ArmadaConfig, ResolvedConfig, ArmadaContext } from '../types/config';
 export class ConfigManager {
     private config: ArmadaConfig | null = null;
     private resolvedConfig: ResolvedConfig | null = null;
+    private pendingSave: Promise<void> = Promise.resolve();
     private outputChannel: vscode.OutputChannel;
 
     constructor(outputChannel: vscode.OutputChannel) {
@@ -183,9 +184,23 @@ export class ConfigManager {
             throw new Error('No config to save');
         }
 
-        const configPath = this.getConfigPath();
-        const yamlContent = yaml.dump(this.config);
-        await fs.writeFile(configPath, yamlContent, 'utf-8');
+        // Writes are serialised and each one dumps the config at the moment it
+        // runs. Concurrent fs.writeFile calls to the same file can finish out
+        // of order, so rapid context switches could otherwise leave the file
+        // on an older context than the one in memory and in the status bar.
+        const write = async () => {
+            if (!this.config) { return; }
+            await this.writeConfigFile(this.getConfigPath(), yaml.dump(this.config));
+        };
+        const next = this.pendingSave.then(write, write);
+        // Keep the chain alive after a failed write; the caller still sees the error.
+        this.pendingSave = next.catch(() => undefined);
+        return next;
+    }
+
+    /** Seam for tests: performs the actual file write. */
+    protected async writeConfigFile(configPath: string, content: string): Promise<void> {
+        await fs.writeFile(configPath, content, 'utf-8');
     }
 
     /**
