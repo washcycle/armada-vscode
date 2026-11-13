@@ -187,6 +187,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 armadaClient = new ArmadaClient(config);
                 wireClientCallbacks(armadaClient);
                 jobTreeProvider.updateClient(armadaClient);
+                ConfigPanel.refreshIfOpen(config, armadaClient);
                 updateStatusBar();
             }
         })
@@ -208,6 +209,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 armadaClient = new ArmadaClient(config);
                 wireClientCallbacks(armadaClient);
                 jobTreeProvider.updateClient(armadaClient);
+                ConfigPanel.refreshIfOpen(config, armadaClient);
                 updateStatusBar();
             }
         })
@@ -320,6 +322,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 armadaClient = new ArmadaClient(config);
                 wireClientCallbacks(armadaClient);
                 jobTreeProvider.updateClient(armadaClient);
+                ConfigPanel.refreshIfOpen(config, armadaClient);
                 updateStatusBar();
                 vscode.window.showInformationMessage('Armada configuration reloaded');
             }

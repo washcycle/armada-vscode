@@ -10,7 +10,7 @@ export interface Activated {
     dispose(): void;
 }
 
-interface Memento {
+export interface Memento {
     get<T>(key: string, defaultValue?: T): T | undefined;
     update(key: string, value: unknown): Promise<void>;
     keys(): readonly string[];
@@ -29,7 +29,11 @@ export function makeMemento(): Memento {
  * Activate a fresh copy of the extension against `configPath`.
  * Auto-refresh is disabled so timers don't leak between tests.
  */
-export async function activateWithConfig(configPath: string, settings: Record<string, unknown> = {}): Promise<Activated> {
+export async function activateWithConfig(
+    configPath: string,
+    settings: Record<string, unknown> = {},
+    state: { workspaceState?: Memento; globalState?: Memento } = {}
+): Promise<Activated> {
     // Other test files uninstall the shared mock in their after() hooks, and the
     // extension module is required at test time, so (re)install it here.
     installVscodeMock();
@@ -38,7 +42,11 @@ export async function activateWithConfig(configPath: string, settings: Record<st
     mockState.settings.set('armada.autoRefresh', false);
     for (const [k, v] of Object.entries(settings)) { mockState.settings.set(k, v); }
 
-    const ctx = { subscriptions: [] as Array<{ dispose(): unknown }>, workspaceState: makeMemento(), globalState: makeMemento() };
+    const ctx = {
+        subscriptions: [] as Array<{ dispose(): unknown }>,
+        workspaceState: state.workspaceState ?? makeMemento(),
+        globalState: state.globalState ?? makeMemento(),
+    };
     const extPath = require.resolve('../../../extension');
     delete require.cache[extPath];
     const ext = require(extPath) as typeof import('../../../extension');
