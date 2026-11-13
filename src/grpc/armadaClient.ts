@@ -6,7 +6,7 @@ import { ResolvedConfig } from '../types/config';
 import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult, RejectedJob } from '../types/armada';
 import * as protobuf from 'protobufjs';
 import { buildAuthHeader, isSecureCredentials, makeAuthInterceptor, withCallCredentials } from './auth';
-import { buildTrustStore, countCertificates, describeCertificateError, resolveCertPath } from './caCerts';
+import { describeCertificateError, resolveCertPath, resolveTrustStore } from './caCerts';
 import { ConversionReport, convertJobItem } from './podSpecConverter';
 import { CONNECTION_TEST_TIMEOUT_MS, DEADLINE_EXCEEDED, DEFAULT_UNARY_TIMEOUT_MS, describeTimeout, makeDeadlineInterceptor } from './deadline';
 import { formatHostPort, parseEndpoint, usesTls } from './endpoint';
@@ -130,6 +130,7 @@ export class ArmadaClient {
     private cachedAuthHeader: string | undefined;
     private trustStore: Buffer | undefined;
     private trustStoreLoaded: boolean = false;
+    private certPathLoaded: boolean = false;
 
     connectionState: ConnectionState = 'unknown';
     onConnectionStateChange: ((state: ConnectionState, detail?: string) => void) | undefined;
@@ -306,11 +307,13 @@ export class ArmadaClient {
     }
 
     /**
-     * The CA bundle to trust, read once per client.
+     * The CA bundle to trust, read once per client: the default roots, plus
+     * OS store certificates (unless `armada.useSystemCertificates` is off),
+     * plus the `caCertPath` bundle.
      *
-     * A configured-but-unreadable bundle is reported and then ignored: failing
-     * the whole client would leave the user with no UI at all, while continuing
-     * with the default roots at least keeps publicly-signed endpoints working.
+     * A configured-but-unreadable `caCertPath` is reported and then ignored:
+     * failing the whole client would leave the user with no UI at all, while
+     * continuing with the default and OS roots keeps everything else working.
      * The message says which file to fix.
      */
     private getTrustStore(): Buffer | undefined {
@@ -319,20 +322,30 @@ export class ArmadaClient {
         }
         this.trustStoreLoaded = true;
 
+        const options = { useSystemCertificates: this.config.useSystemCertificates };
+        let resolved;
         try {
-            this.trustStore = buildTrustStore(this.config.caCertPath);
-            if (this.trustStore && this.config.caCertPath) {
-                const extra = countCertificates(this.trustStore) - tls.rootCertificates.length;
-                this.logInfo(
-                    `Trusting ${extra} extra CA certificate(s) from ` +
-                    `${resolveCertPath(this.config.caCertPath)} in addition to the system roots.`
-                );
-            }
+            resolved = resolveTrustStore(this.config.caCertPath, options);
+            this.certPathLoaded = resolved.fileCount > 0;
         } catch (error: any) {
-            this.trustStore = undefined;
             this.logError(
-                `${error.message} Falling back to the default certificate store, ` +
-                'so connections through a TLS-inspecting proxy will likely fail.'
+                `${error.message} Ignoring it, so connections through a TLS-inspecting ` +
+                'proxy whose CA is not in the OS certificate store will likely fail.'
+            );
+            resolved = resolveTrustStore(undefined, options);
+        }
+
+        this.trustStore = resolved.bundle;
+        if (resolved.systemCount > 0) {
+            this.logInfo(
+                `Trusting ${resolved.systemCount} CA certificate(s) from the operating system ` +
+                'store in addition to the bundled roots.'
+            );
+        }
+        if (resolved.fileCount > 0 && this.config.caCertPath) {
+            this.logInfo(
+                `Trusting ${resolved.fileCount} extra CA certificate(s) from ` +
+                `${resolveCertPath(this.config.caCertPath)}.`
             );
         }
 
@@ -347,7 +360,8 @@ export class ArmadaClient {
      * file that was never read. The load failure is reported separately.
      */
     private activeCertPath(): string | undefined {
-        return this.getTrustStore() ? this.config.caCertPath : undefined;
+        this.getTrustStore();
+        return this.certPathLoaded ? this.config.caCertPath : undefined;
     }
 
     /**

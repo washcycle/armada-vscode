@@ -50,6 +50,7 @@ export interface ResolvedConfig {
     lookoutUrl?: string; // Lookout v2 UI/API base URL
     forceNoTls?: boolean; // When true, use insecure (plaintext) gRPC even if TLS is detected
     caCertPath?: string; // PEM bundle of extra CAs to trust (corporate TLS proxies)
+    useSystemCertificates?: boolean; // Trust the OS certificate store too (armada.useSystemCertificates, default true)
     currentContext?: string;
     auth?: {
         type: 'oidc' | 'basic' | 'exec' | 'none';

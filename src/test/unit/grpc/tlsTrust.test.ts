@@ -1,9 +1,15 @@
 import * as assert from 'assert';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as tls from 'tls';
 import { MockArmadaServer } from '../../mock/armadaServer';
 import { ArmadaClient } from '../../../grpc/armadaClient';
+import {
+    certificatesNotIn,
+    countCertificates,
+    defaultRoots,
+    readSystemCertificates,
+    setSystemCertificatesForTesting
+} from '../../../grpc/caCerts';
 import {
     cleanupSelfSignedCert,
     generateSelfSignedCert,
@@ -92,8 +98,11 @@ describe('TLS trust via caCertPath', function () {
             auth: { type: 'none' }
         });
         const store = (client as any).getTrustStore() as Buffer;
-        const count = store.toString('utf-8').split('-----BEGIN CERTIFICATE-----').length - 1;
-        assert.strictEqual(count, tls.rootCertificates.length + 1);
+        const roots = defaultRoots();
+        const expected = countCertificates(Buffer.from(roots.join('\n')))
+            + certificatesNotIn(readSystemCertificates(), roots).length
+            + 1;
+        assert.strictEqual(countCertificates(store), expected);
     });
 
     it('falls back to default roots and logs when the bundle is missing', async function () {
@@ -138,5 +147,43 @@ describe('TLS trust via caCertPath', function () {
         );
         // Still guides the user toward configuring a working bundle.
         assert.match(joined, /caCertPath/);
+    });
+
+    describe('via the operating system certificate store', () => {
+        afterEach(() => setSystemCertificatesForTesting(undefined));
+
+        it('connects with no caCertPath when IT installed the CA in the OS store', async function () {
+            // The Zscaler / Netskope case: the proxy CA is in the Windows
+            // store or macOS keychain, and nothing is configured in VS Code.
+            this.timeout(30_000);
+            setSystemCertificatesForTesting([generated!.cert.toString()]);
+            const messages: string[] = [];
+            const client = new ArmadaClient({ armadaUrl, auth: { type: 'none' } });
+            client.onLogMessage = (message) => messages.push(message);
+
+            const result = await client.testConnection();
+            assert.strictEqual(result.ok, true, result.message ?? "");
+            assert.match(messages.join('\n'), /1 CA certificate\(s\) from the operating system store/);
+        });
+
+        it('ignores the OS store when armada.useSystemCertificates is off', async function () {
+            this.timeout(30_000);
+            setSystemCertificatesForTesting([generated!.cert.toString()]);
+            const client = new ArmadaClient({ armadaUrl, useSystemCertificates: false, auth: { type: 'none' } });
+            const result = await client.testConnection();
+            assert.strictEqual(result.ok, false, 'OS store must not be consulted when disabled');
+        });
+
+        it('keeps OS trust when a configured caCertPath cannot be read', async function () {
+            this.timeout(30_000);
+            setSystemCertificatesForTesting([generated!.cert.toString()]);
+            const client = new ArmadaClient({
+                armadaUrl,
+                caCertPath: path.join(generated!.dir, 'absent.pem'),
+                auth: { type: 'none' }
+            });
+            const result = await client.testConnection();
+            assert.strictEqual(result.ok, true, result.message ?? "");
+        });
     });
 });

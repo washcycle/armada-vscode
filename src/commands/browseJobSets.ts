@@ -35,12 +35,20 @@ export async function browseJobSetsCommand(
             console.warn(`[Armada] Could not build Lookout auth header: ${error.message}`);
         }
         // Trust the same extra CAs as the gRPC clients, so a corporate TLS
-        // proxy in front of Lookout does not break job-set browsing.
+        // proxy in front of Lookout does not break job-set browsing. Only
+        // when caCertPath is set: otherwise requests use the global agent,
+        // which VS Code already extends with the OS certificate store
+        // (`http.systemCertificates`) and `http.proxy`, and swapping in our
+        // own agent would risk losing that.
         let caCerts: Buffer | undefined;
-        try {
-            caCerts = buildTrustStore(config?.caCertPath);
-        } catch (error: any) {
-            console.warn(`[Armada] ${error.message}`);
+        if (config?.caCertPath) {
+            try {
+                caCerts = buildTrustStore(config.caCertPath, {
+                    useSystemCertificates: config.useSystemCertificates
+                });
+            } catch (error: any) {
+                console.warn(`[Armada] ${error.message}`);
+            }
         }
         const lookoutClient = new LookoutClient({
             lookoutUrl,

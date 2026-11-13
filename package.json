@@ -277,6 +277,11 @@
           "default": "",
           "markdownDescription": "Path to a PEM CA certificate bundle to trust for TLS, in addition to the system roots. Needed on corporate networks where a TLS-inspecting proxy (Zscaler, Netskope, a company CA) re-signs traffic, which otherwise fails with `UNAVAILABLE` and a certificate error. Supports `~`. A `caCertPath` on the active armadactl context takes precedence over this setting."
         },
+        "armada.useSystemCertificates": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Trust CA certificates from the operating system's certificate store (Windows certificate store, macOS keychain, the Linux system bundle) in addition to the bundled public roots. This makes corporate TLS-inspecting proxies such as Zscaler or Netskope work without configuration when IT has installed their CA on the machine. Requires VS Code with Node 22.15 or newer; on older versions it has no effect. Use `#armada.caCertPath#` for CAs that are not in the OS store."
+        },
         "armada.autoRefresh": {
           "type": "boolean",
           "default": true,
