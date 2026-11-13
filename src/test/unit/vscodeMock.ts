@@ -138,6 +138,7 @@ export const vscodeMock = {
         showErrorMessage: async (text: string) => { mockState.messages.push({ level: 'error', text }); return undefined; },
         showWarningMessage: async (text: string) => { mockState.messages.push({ level: 'warn', text }); return undefined; },
         showQuickPick: async () => undefined,
+        activeTextEditor: undefined as unknown,
         withProgress: async (_opts: unknown, task: (p: { report(): void }) => unknown) => task({ report: () => undefined }),
     },
     workspace: {

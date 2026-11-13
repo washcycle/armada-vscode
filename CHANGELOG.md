@@ -1,5 +1,71 @@
 # Changelog
 
+## [0.5.3](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.2...armada-vscode-v0.5.3) (2026-07-28)
+
+
+### Bug Fixes
+
+* **panel:** decode protobuf Timestamp and Quantity in job details ([b3b0110](https://github.com/washcycle/armada-vscode/commit/b3b011049dfc7b15d5faaaee5d6e69bed2295d55))
+
+## [0.5.2](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.1...armada-vscode-v0.5.2) (2026-07-28)
+
+
+### Bug Fixes
+
+* **grpc:** stop deriving a bogus Binoculars port for TLS endpoints ([9a8202f](https://github.com/washcycle/armada-vscode/commit/9a8202f8fcdb904ee0a94dc77c880e5e682dbbfa))
+
+## [0.5.1](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.0...armada-vscode-v0.5.1) (2026-07-27)
+
+
+### Bug Fixes
+
+* **submit:** accept podSpec and stop dropping job fields silently ([102317d](https://github.com/washcycle/armada-vscode/commit/102317d6e7d3f53925e795e5d7604ba5dcc7973f))
+
+## [0.5.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.4.0...armada-vscode-v0.5.0) (2026-07-25)
+
+
+### Features
+
+* trust extra CA certificates via armada.caCertPath ([#70](https://github.com/washcycle/armada-vscode/issues/70)) ([82014d0](https://github.com/washcycle/armada-vscode/commit/82014d0e30b9781968668f7a33d39cc272cb6bb4))
+
+
+### Bug Fixes
+
+* **build:** unbreak CI under typescript 6 ([#67](https://github.com/washcycle/armada-vscode/issues/67)) ([6e27143](https://github.com/washcycle/armada-vscode/commit/6e27143d8de1ce62fc804e05850fe804e94543dc))
+* send configured credentials on gRPC and Lookout requests ([#66](https://github.com/washcycle/armada-vscode/issues/66)) ([61074b2](https://github.com/washcycle/armada-vscode/commit/61074b22f171c335d16f5729f5357ecf23850376))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @types/glob from 8.1.0 to 9.0.0 ([#62](https://github.com/washcycle/armada-vscode/issues/62)) ([34b985a](https://github.com/washcycle/armada-vscode/commit/34b985a0a3749c8997e4979e9ea4a8781034e822))
+* **deps-dev:** bump eslint from 9.39.2 to 10.1.0 ([#61](https://github.com/washcycle/armada-vscode/issues/61)) ([487483b](https://github.com/washcycle/armada-vscode/commit/487483bec203886528ada095ba0b6599f9e89c67))
+* **deps-dev:** bump typescript from 5.9.3 to 6.0.2 ([#60](https://github.com/washcycle/armada-vscode/issues/60)) ([dad5763](https://github.com/washcycle/armada-vscode/commit/dad5763ef76eb6ed7e2afe89284df0176bd7bcae))
+* **deps:** bump picomatch in the npm_and_yarn group across 1 directory ([#65](https://github.com/washcycle/armada-vscode/issues/65)) ([b9d61fe](https://github.com/washcycle/armada-vscode/commit/b9d61fe252d4012ad171270394813fdd3b126965))
+* **deps:** bump the npm_and_yarn group across 1 directory with 4 updates ([#69](https://github.com/washcycle/armada-vscode/issues/69)) ([4ecb6f2](https://github.com/washcycle/armada-vscode/commit/4ecb6f242c5f286a8e367887650501133829f2d7))
+
+
+### Tests
+
+* unit and package all succeed. ([6e27143](https://github.com/washcycle/armada-vscode/commit/6e27143d8de1ce62fc804e05850fe804e94543dc))
+
+## [0.4.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.3.0...armada-vscode-v0.4.0) (2026-03-20)
+
+
+### Features
+
+* **diagnostics:** add connection health status bar and config viewer panel ([#56](https://github.com/washcycle/armada-vscode/issues/56)) ([62d921e](https://github.com/washcycle/armada-vscode/commit/62d921e07e61a57c335add659599f8ca40b9204b))
+* status bar job counts, [object Object] fix, regression tests ([#59](https://github.com/washcycle/armada-vscode/issues/59)) ([af8fc2a](https://github.com/washcycle/armada-vscode/commit/af8fc2a6dd48a3d2adf4d313929c14887e87d1d7))
+
+
+### Bug Fixes
+
+* **dev:** clean up CI redis resources before Helm install ([#53](https://github.com/washcycle/armada-vscode/issues/53)) ([34ba160](https://github.com/washcycle/armada-vscode/commit/34ba1600331327c8f3f7ace3507d761e59ce8732))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump flatted ([#58](https://github.com/washcycle/armada-vscode/issues/58)) ([9c701d1](https://github.com/washcycle/armada-vscode/commit/9c701d16fa52ae7357801698a398ec6523491249))
+
 ## [0.3.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.2.4...armada-vscode-v0.3.0) (2026-03-19)
 
 

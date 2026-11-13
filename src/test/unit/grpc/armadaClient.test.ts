@@ -87,6 +87,67 @@ describe('ArmadaClient', () => {
         assert.strictEqual(statusMap.get(jobId), 'RUNNING');
     });
 
+    it('sends basic auth credentials to the server', async () => {
+        // Regression test: the extension used to parse basicAuth from the
+        // armadactl config and then never send it, so any server with
+        // anonymousAuth disabled answered 16 UNAUTHENTICATED.
+        mockServer.resetLastMetadata();
+
+        const authClient = new ArmadaClient({
+            armadaUrl: config.armadaUrl,
+            auth: { type: 'basic', credentials: { username: 'apqx', password: 's3cret' } }
+        });
+
+        await authClient.getAllQueues();
+
+        const expected = 'Basic ' + Buffer.from('apqx:s3cret').toString('base64');
+        assert.strictEqual(mockServer.getLastAuthorization(), expected);
+    });
+
+    it('sends credentials on streaming calls too', async () => {
+        mockServer.resetLastMetadata();
+
+        const authClient = new ArmadaClient({
+            armadaUrl: config.armadaUrl,
+            auth: { type: 'basic', credentials: { username: 'apqx', password: 's3cret' } }
+        });
+
+        await new Promise<void>((resolve, reject) => {
+            const stop = authClient.streamJobSetEvents(
+                'test-queue',
+                'test-job-set',
+                () => undefined,
+                (err) => reject(err)
+            );
+            setTimeout(() => { stop(); resolve(); }, 300);
+        });
+
+        const expected = 'Basic ' + Buffer.from('apqx:s3cret').toString('base64');
+        assert.strictEqual(mockServer.getLastAuthorization(), expected);
+    });
+
+    it('sends no authorization header when auth type is none', async () => {
+        mockServer.resetLastMetadata();
+        await client.getAllQueues();
+        assert.strictEqual(mockServer.getLastAuthorization(), undefined);
+    });
+
+    it('warns when sending credentials over a plaintext connection', async () => {
+        const messages: string[] = [];
+        const authClient = new ArmadaClient({
+            armadaUrl: config.armadaUrl,
+            auth: { type: 'basic', credentials: { username: 'apqx', password: 's3cret' } }
+        });
+        authClient.onLogMessage = (message) => messages.push(message);
+
+        await authClient.getAllQueues();
+
+        assert.ok(
+            messages.some(m => /WARNING.*unencrypted connection/.test(m)),
+            `expected a plaintext warning, got: ${JSON.stringify(messages)}`
+        );
+    });
+
     it('client connects successfully with forceNoTls set to true', async () => {
         // Construct a URL that would normally cause TLS credentials to be selected.
         const [host, port] = config.armadaUrl.split(':');

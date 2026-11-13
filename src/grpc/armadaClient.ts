@@ -1,15 +1,14 @@
 import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import * as path from 'path';
+import * as tls from 'tls';
 import { ResolvedConfig } from '../types/config';
-import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult } from '../types/armada';
+import { ArmadaJobSpec, SubmitJobResponse, JobEventMessage, Queue, ConnectionState, ConnectionTestResult, RejectedJob } from '../types/armada';
+import * as protobuf from 'protobufjs';
+import { buildAuthHeader, isSecureCredentials, makeAuthInterceptor, withCallCredentials } from './auth';
+import { buildTrustStore, countCertificates, describeCertificateError, resolveCertPath } from './caCerts';
+import { ConversionReport, convertJobItem } from './podSpecConverter';
 
-/**
- * Select gRPC channel credentials for a given endpoint URL.
- * Returns SSL credentials when the URL uses an `https://` scheme or targets
- * port 443.  Passing `forceNoTls: true` always returns insecure credentials
- * regardless of the URL (useful for development / plain-text servers).
- */
 /**
  * Strip any `http://` or `https://` scheme prefix from a URL so that the
  * result can be used as a bare `host:port` gRPC target string.
@@ -18,16 +17,117 @@ export function stripScheme(url: string): string {
     return url.replace(/^https?:\/\//, '');
 }
 
-export function selectCredentials(url: string, forceNoTls?: boolean): grpc.ChannelCredentials {
+/**
+ * Whether a given endpoint will be dialed over TLS: an `https://` scheme or a
+ * `:443` port, unless `forceNoTls` overrides it.
+ *
+ * Exposed separately from `selectCredentials` so callers can branch on the
+ * transport without building (and, for TLS, loading root certs into) a
+ * credentials object.
+ */
+export function usesTls(url: string, forceNoTls?: boolean): boolean {
     if (forceNoTls) {
-        return grpc.credentials.createInsecure();
+        return false;
     }
     // Strip the scheme and path, then check whether the host:port portion ends with :443
     const hostPort = url.replace(/^https?:\/\//, '').split('/')[0];
-    if (url.startsWith('https://') || hostPort.endsWith(':443')) {
-        return grpc.credentials.createSsl();
+    return url.startsWith('https://') || hostPort.endsWith(':443');
+}
+
+/**
+ * Guess the Binoculars endpoint from the Armada endpoint.
+ *
+ * The `+2` offset comes from the quickstart's NodePort layout, where every
+ * service gets its own port on a single host:
+ *   localhost:30002            -> localhost:30004
+ *   armada.example.com:50051   -> armada.example.com:50053
+ *
+ * That relationship does not exist behind a TLS reverse proxy or ingress, where
+ * all services are fronted on 443 and separated by hostname instead. Deriving
+ * there produces port 445 (SMB), and the log request fails with ECONNREFUSED —
+ * which reads as "Binoculars is down" when in truth it was never configured.
+ * The same applies to any explicit `https://` endpoint.
+ *
+ * Returns `{url: null, reason}` instead of guessing in those cases, so the
+ * caller can tell the user which setting is missing.
+ */
+export function deriveBinocularsUrl(armadaUrl: string): { url: string | null; reason: string } {
+    const urlMatch = armadaUrl.match(/^(?:(https?):\/\/)?([^:/]+)(?::(\d+))?$/);
+    if (!urlMatch) {
+        return { url: null, reason: `Could not parse the Armada URL "${armadaUrl}" to derive a Binoculars URL.` };
     }
-    return grpc.credentials.createInsecure();
+
+    const [, scheme, host, portText] = urlMatch;
+    const port = portText ? parseInt(portText, 10) : null;
+
+    if (scheme === 'https' || port === 443) {
+        return {
+            url: null,
+            reason: `Cannot infer a Binoculars URL from the TLS endpoint "${armadaUrl}", because ` +
+                'services behind an ingress share one port and differ only by hostname. ' +
+                'Set binocularsUrl (or binocularsUrlPattern for multi-cluster setups) in your ' +
+                'armadactl config to view job logs.'
+        };
+    }
+
+    if (!port) {
+        return {
+            url: null,
+            reason: `The Armada URL "${armadaUrl}" has no port, so a Binoculars URL cannot be derived. ` +
+                'Set binocularsUrl in your armadactl config to view job logs.'
+        };
+    }
+
+    return { url: `${host}:${port + 2}`, reason: '' };
+}
+
+/**
+ * Select gRPC channel credentials for a given endpoint URL.
+ * Returns SSL credentials when the URL uses an `https://` scheme or targets
+ * port 443.  Passing `forceNoTls: true` always returns insecure credentials
+ * regardless of the URL (useful for development / plain-text servers).
+ */
+export function selectCredentials(
+    url: string,
+    forceNoTls?: boolean,
+    rootCerts?: Buffer
+): grpc.ChannelCredentials {
+    return usesTls(url, forceNoTls)
+        // A CA bundle replaces the default roots for this channel. Corporate
+        // TLS-inspecting proxies re-sign traffic with a CA that is not in
+        // Node's bundled root store, so without this the handshake fails.
+        ? grpc.credentials.createSsl(rootCerts)
+        : grpc.credentials.createInsecure();
+}
+
+/**
+ * Message descriptors used to convert YAML into the exact shape the vendored
+ * protos expect.
+ *
+ * @grpc/proto-loader exposes only serialize/deserialize for message types, not
+ * the protobufjs `Type` needed to walk fields, so the descriptors are loaded
+ * separately. Parsed once and cached: the k8s protos are large and the result is
+ * immutable.
+ */
+let submitTypes: { podSpec: protobuf.Type; jobItem: protobuf.Type } | undefined;
+
+export function getSubmitTypes(): { podSpec: protobuf.Type; jobItem: protobuf.Type } {
+    if (submitTypes) {
+        return submitTypes;
+    }
+    const protoRoot = path.join(__dirname, 'proto');
+    const root = new protobuf.Root();
+    // Resolve imports against the bundled proto tree, mirroring the
+    // `includeDirs` given to proto-loader.
+    root.resolvePath = (_origin, target) => path.resolve(protoRoot, target);
+    // keepCase matches the proto-loader options, so field names stay as the
+    // proto declares them (`priorityClassName`, not `priority_class_name`).
+    root.loadSync('pkg/api/submit.proto', { keepCase: true });
+    submitTypes = {
+        podSpec: root.lookupType('k8s.io.api.core.v1.PodSpec'),
+        jobItem: root.lookupType('api.JobSubmitRequestItem')
+    };
+    return submitTypes;
 }
 
 export class ArmadaClient {
@@ -36,11 +136,18 @@ export class ArmadaClient {
     private jobsClient: any;
     private binocularsClient: any; // Default Binoculars client (no cluster ID)
     private binocularsClients: Map<string, any> = new Map(); // Cluster-specific Binoculars clients
+    /** Why the Binoculars URL could not be determined, surfaced by getLogs. */
+    private binocularsUrlError: string | undefined;
     private config: ResolvedConfig;
     private initialized: boolean = false;
+    private cachedAuthHeader: string | undefined;
+    private trustStore: Buffer | undefined;
+    private trustStoreLoaded: boolean = false;
 
     connectionState: ConnectionState = 'unknown';
     onConnectionStateChange: ((state: ConnectionState, detail?: string) => void) | undefined;
+    /** Optional sink so connection/auth failures reach the output channel. */
+    onLogMessage: ((message: string) => void) | undefined;
 
     constructor(config: ResolvedConfig) {
         this.config = config;
@@ -56,12 +163,35 @@ export class ArmadaClient {
 
     private classifyGrpcError(error: any): void {
         const code: number | undefined = error?.code;
+        // The server's own explanation is the most useful part of the error and
+        // used to be dropped entirely, which made misconfigurations undebuggable.
+        const details: string = error?.details || error?.message || '';
+        const suffix = details ? ` Server said: ${details}` : '';
+
         if (code === 14) {
-            this.updateConnectionState('error', `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`);
+            // A certificate rejection arrives as UNAVAILABLE with the OpenSSL
+            // reason buried in `details`, which reads like the server is down.
+            // Corporate TLS proxies are the usual cause, so name the remedy.
+            const certHint = describeCertificateError(details, this.activeCertPath());
+            this.logError(`UNAVAILABLE from ${this.config.armadaUrl}.${suffix}${certHint}`);
+            this.updateConnectionState(
+                'error',
+                certHint
+                    ? `TLS certificate verification failed for ${this.config.armadaUrl}.${certHint}`
+                    : `Cannot reach Armada server at ${this.config.armadaUrl}. Is armada-server running?`
+            );
         } else if (code === 13) {
-            this.updateConnectionState('error', `Armada server returned an internal error.`);
+            this.logError(`INTERNAL error from ${this.config.armadaUrl}.${suffix}`);
+            this.updateConnectionState('error', `Armada server returned an internal error.${suffix}`);
         } else if (code === 16 || code === 7) {
-            this.updateConnectionState('auth-error', 'Authentication failed. Check your credentials.');
+            const authType = this.config.auth?.type ?? 'none';
+            const hint = authType === 'none'
+                ? ' No credentials are configured for this context — add basicAuth or execAuth to your armadactl config.'
+                : ` Credentials of type "${authType}" were sent but rejected.`;
+            this.logError(`${code === 16 ? 'UNAUTHENTICATED' : 'PERMISSION_DENIED'} from ${this.config.armadaUrl}.${suffix}${hint}`);
+            this.updateConnectionState('auth-error', `Authentication failed.${hint}${suffix}`);
+        } else if (code !== undefined) {
+            this.logError(`gRPC error code ${code} from ${this.config.armadaUrl}.${suffix}`);
         }
         // Application-level errors (5, 12, 2, etc.) do not change state
     }
@@ -117,7 +247,8 @@ export class ArmadaClient {
         const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
         const client = new binocularsProto.binoculars.Binoculars(
             binocularsUrl,
-            this.getCredentials(binocularsUrl)
+            this.getCredentials(binocularsUrl),
+            this.clientOptionsFor(binocularsUrl)
         );
 
         // Cache the client
@@ -128,39 +259,20 @@ export class ArmadaClient {
     }
 
     /**
-     * Derive Binoculars URL from Armada URL
-     * Pattern: If Armada is on port X, Binoculars gRPC is typically on port X+2
-     * Examples:
-     *   localhost:30002 -> localhost:30004
-     *   armada.example.com:50051 -> armada.example.com:50053
+     * Derive a Binoculars URL from the Armada URL, logging the reason on failure.
+     * See the module-level `deriveBinocularsUrl` for why derivation is not
+     * always possible.
      */
     private deriveBinocularsUrl(armadaUrl: string): string | null {
-        try {
-            // Parse the URL
-            const urlMatch = armadaUrl.match(/^(?:https?:\/\/)?([^:]+)(?::(\d+))?$/);
-            if (!urlMatch) {
-                console.log('[Armada] Could not parse Armada URL for Binoculars derivation:', armadaUrl);
-                return null;
-            }
-
-            const host = urlMatch[1];
-            const port = urlMatch[2] ? parseInt(urlMatch[2]) : null;
-
-            if (!port) {
-                console.log('[Armada] Armada URL has no port, cannot derive Binoculars URL');
-                return null;
-            }
-
-            // Binoculars gRPC port is typically Armada gRPC port + 2
-            const binocularsPort = port + 2;
-            const binocularsUrl = `${host}:${binocularsPort}`;
-
-            console.log('[Armada] Derived Binoculars URL:', binocularsUrl);
-            return binocularsUrl;
-        } catch (error) {
-            console.error('[Armada] Error deriving Binoculars URL:', error);
+        const derived = deriveBinocularsUrl(armadaUrl);
+        if (derived.url === null) {
+            // Kept so getLogs can report why, instead of blaming Binoculars.
+            this.binocularsUrlError = derived.reason;
+            this.logWarning(derived.reason);
             return null;
         }
+        console.log('[Armada] Derived Binoculars URL:', derived.url);
+        return derived.url;
     }
 
     /**
@@ -169,7 +281,144 @@ export class ArmadaClient {
      * unless `forceNoTls` is set in the config.
      */
     private getCredentials(url: string): grpc.ChannelCredentials {
-        return selectCredentials(url, this.config.forceNoTls);
+        const channelCredentials = selectCredentials(url, this.config.forceNoTls, this.getTrustStore());
+
+        // Attach the credentials from the armadactl config to every call on
+        // this channel. Without this the extension parses basicAuth/execAuth
+        // and then never sends it, so any server with anonymousAuth disabled
+        // answers 16 UNAUTHENTICATED.
+        if (!this.hasAuth()) {
+            return channelCredentials;
+        }
+
+        if (!isSecureCredentials(channelCredentials)) {
+            // gRPC refuses call credentials on a plaintext channel
+            // ("Cannot compose insecure credentials"), so these channels get
+            // the header from the interceptor in clientOptionsFor() instead.
+            this.logWarning(
+                `Sending credentials over an unencrypted connection to ${url}. ` +
+                'Credentials will be transmitted in plaintext.'
+            );
+            return channelCredentials;
+        }
+
+        return withCallCredentials(channelCredentials, () => this.getAuthHeader());
+    }
+
+    private hasAuth(): boolean {
+        return !!this.config.auth && this.config.auth.type !== 'none';
+    }
+
+    /**
+     * The CA bundle to trust, read once per client.
+     *
+     * A configured-but-unreadable bundle is reported and then ignored: failing
+     * the whole client would leave the user with no UI at all, while continuing
+     * with the default roots at least keeps publicly-signed endpoints working.
+     * The message says which file to fix.
+     */
+    private getTrustStore(): Buffer | undefined {
+        if (this.trustStoreLoaded) {
+            return this.trustStore;
+        }
+        this.trustStoreLoaded = true;
+
+        try {
+            this.trustStore = buildTrustStore(this.config.caCertPath);
+            if (this.trustStore && this.config.caCertPath) {
+                const extra = countCertificates(this.trustStore) - tls.rootCertificates.length;
+                this.logInfo(
+                    `Trusting ${extra} extra CA certificate(s) from ` +
+                    `${resolveCertPath(this.config.caCertPath)} in addition to the system roots.`
+                );
+            }
+        } catch (error: any) {
+            this.trustStore = undefined;
+            this.logError(
+                `${error.message} Falling back to the default certificate store, ` +
+                'so connections through a TLS-inspecting proxy will likely fail.'
+            );
+        }
+
+        return this.trustStore;
+    }
+
+    /**
+     * The CA bundle path actually in effect, or undefined if none is.
+     *
+     * A configured-but-unloadable bundle is *not* in effect: telling the user
+     * their bundle "did not contain the signing CA" would send them auditing a
+     * file that was never read. The load failure is reported separately.
+     */
+    private activeCertPath(): string | undefined {
+        return this.getTrustStore() ? this.config.caCertPath : undefined;
+    }
+
+    /**
+     * Client options for a given endpoint.
+     *
+     * Secure channels carry the auth header via call credentials (see
+     * `getCredentials`). Plaintext channels cannot — gRPC refuses to compose
+     * call credentials with insecure channel credentials — so they get an
+     * interceptor that sets the header on every outgoing call instead. Doing it
+     * as an interceptor rather than per call site covers unary and streaming
+     * methods alike.
+     */
+    private clientOptionsFor(url: string): grpc.ClientOptions {
+        if (!this.needsAuthInterceptor(url)) {
+            return {};
+        }
+        return {
+            interceptors: [
+                makeAuthInterceptor(
+                    () => this.getAuthHeader(),
+                    message => this.logError(message)
+                )
+            ]
+        };
+    }
+
+    /**
+     * True when auth is configured but the channel is plaintext, so the header
+     * has to be injected per call rather than by the channel credentials.
+     */
+    private needsAuthInterceptor(url: string): boolean {
+        return this.hasAuth() && !usesTls(url, this.config.forceNoTls);
+    }
+
+    /**
+     * Resolve the `authorization` header value, caching it for basic auth
+     * (which is static) while letting exec-based tokens be re-fetched.
+     */
+    private async getAuthHeader(): Promise<string | undefined> {
+        if (this.config.auth?.type === 'basic') {
+            if (this.cachedAuthHeader === undefined) {
+                this.cachedAuthHeader = await buildAuthHeader(this.config.auth);
+            }
+            return this.cachedAuthHeader;
+        }
+        return buildAuthHeader(this.config.auth);
+    }
+
+    private logInfo(message: string): void {
+        console.log(`[Armada] ${message}`);
+        if (this.onLogMessage) {
+            this.onLogMessage(message);
+        }
+    }
+
+    private logWarning(message: string): void {
+        console.warn(`[Armada] ${message}`);
+        if (this.onLogMessage) {
+            this.onLogMessage(`WARNING: ${message}`);
+        }
+    }
+
+    private logError(message: string): void {
+        console.error(`[Armada] ${message}`);
+        if (this.onLogMessage) {
+            this.onLogMessage(`ERROR: ${message}`);
+        }
     }
 
     private initializeClients(): void {
@@ -178,6 +427,7 @@ export class ArmadaClient {
         }
 
         const credentials = this.getCredentials(this.config.armadaUrl);
+        const clientOptions = this.clientOptionsFor(this.config.armadaUrl);
         const armadaTarget = stripScheme(this.config.armadaUrl);
 
         // Set up proto include paths
@@ -197,7 +447,8 @@ export class ArmadaClient {
         const submitProto = grpc.loadPackageDefinition(submitPackageDefinition) as any;
         this.submitClient = new submitProto.api.Submit(
             armadaTarget,
-            credentials
+            credentials,
+            clientOptions
         );
 
         // Load Event service
@@ -206,7 +457,8 @@ export class ArmadaClient {
         const eventProto = grpc.loadPackageDefinition(eventPackageDefinition) as any;
         this.eventClient = new eventProto.api.Event(
             armadaTarget,
-            credentials
+            credentials,
+            clientOptions
         );
 
         // Load Jobs service (Query API)
@@ -215,7 +467,8 @@ export class ArmadaClient {
         const jobProto = grpc.loadPackageDefinition(jobPackageDefinition) as any;
         this.jobsClient = new jobProto.api.Jobs(
             armadaTarget,
-            credentials
+            credentials,
+            clientOptions
         );
 
         // Load Binoculars service (for logs)
@@ -229,7 +482,8 @@ export class ArmadaClient {
             const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
             this.binocularsClient = new binocularsProto.binoculars.Binoculars(
                 binocularsUrl,
-                this.getCredentials(binocularsUrl)
+                this.getCredentials(binocularsUrl),
+                this.clientOptionsFor(binocularsUrl)
             );
             console.log('[Armada] Binoculars client initialized at:', binocularsUrl);
             if (!this.config.binocularsUrl) {
@@ -248,7 +502,7 @@ export class ArmadaClient {
     async submitJobs(jobSpec: ArmadaJobSpec): Promise<SubmitJobResponse> {
         this.initializeClients();
         return new Promise((resolve, reject) => {
-            const jobRequestItems = jobSpec.jobs.map(job => this.convertJobToProto(job));
+            const jobRequestItems = jobSpec.jobs.map((job, index) => this.convertJobToProto(job, index));
 
             // Debug logging
             console.log('[Armada] Submitting jobs:', JSON.stringify({
@@ -274,9 +528,34 @@ export class ArmadaClient {
 
                 this.updateConnectionState('connected');
                 console.log('[Armada] Submit successful:', response);
-                resolve({
-                    jobIds: response.job_response_items || []
+
+                // The server reports per-item failures inside a successful call,
+                // so a response is not proof every job was accepted.
+                const items: any[] = response.job_response_items || [];
+                const jobIds: string[] = [];
+                const rejected: RejectedJob[] = [];
+
+                items.forEach((item, index) => {
+                    const error = typeof item?.error === 'string' ? item.error.trim() : '';
+                    if (error) {
+                        rejected.push({ index, error });
+                        return;
+                    }
+                    const jobId = item?.job_id || item?.jobId;
+                    if (jobId) {
+                        jobIds.push(String(jobId));
+                    } else {
+                        // Neither an id nor a reason: still a failure, and
+                        // reporting it beats inventing a job that does not exist.
+                        rejected.push({ index, error: 'server returned no job id' });
+                    }
                 });
+
+                for (const failure of rejected) {
+                    this.logError(`Armada rejected jobs[${failure.index}]: ${failure.error}`);
+                }
+
+                resolve({ jobIds, rejected });
             });
         });
     }
@@ -489,93 +768,26 @@ export class ArmadaClient {
     /**
      * Convert job spec to protobuf format
      */
-    private convertJobToProto(job: any): any {
-        console.log('[Armada] Converting job to proto:', JSON.stringify(job, null, 2));
+    private convertJobToProto(job: any, jobIndex = 0): any {
+        const report: ConversionReport = { unknownFields: [] };
+        const { podSpec, jobItem } = getSubmitTypes();
 
-        // Convert podSpecs to Kubernetes PodSpec format
-        const podSpecs = job.podSpecs ? job.podSpecs.map((spec: any) => {
-            console.log('[Armada] Processing podSpec:', JSON.stringify(spec, null, 2));
+        // Walks the descriptor rather than an allowlist, and accepts both the
+        // singular `podSpec:` and the plural `podSpecs:` forms. Reading only the
+        // plural made most real job files — and this extension's own README
+        // example — submit an empty pod_specs, which the server rejects with
+        // "Job must contain at least one PodSpec".
+        const result = convertJobItem(job, jobItem, podSpec, report, `jobs[${jobIndex}]`);
 
-            // Convert containers with proper resource format
-            const containers = (spec.containers || []).map((container: any) => {
-                const convertedContainer: any = {
-                    name: container.name,
-                    image: container.image,
-                    command: container.command,
-                    args: container.args,
-                    imagePullPolicy: container.imagePullPolicy
-                };
+        // A typo'd or unsupported key would otherwise vanish without trace: the
+        // job submits and then behaves differently than the file describes.
+        if (report.unknownFields.length > 0) {
+            this.logWarning(
+                `Ignoring ${report.unknownFields.length} unrecognized field(s) in the job file: ` +
+                `${report.unknownFields.join(', ')}. Check for typos — these are not sent to Armada.`
+            );
+        }
 
-                // Convert resources to Kubernetes Quantity format
-                if (container.resources) {
-                    convertedContainer.resources = {};
-
-                    if (container.resources.limits) {
-                        convertedContainer.resources.limits = {};
-                        for (const [key, value] of Object.entries(container.resources.limits)) {
-                            convertedContainer.resources.limits[key] = { string: String(value) };
-                        }
-                    }
-
-                    if (container.resources.requests) {
-                        convertedContainer.resources.requests = {};
-                        for (const [key, value] of Object.entries(container.resources.requests)) {
-                            convertedContainer.resources.requests[key] = { string: String(value) };
-                        }
-                    }
-                }
-
-                // Add other optional container fields
-                if (container.env) convertedContainer.env = container.env;
-                if (container.volumeMounts) convertedContainer.volumeMounts = container.volumeMounts;
-                if (container.ports) convertedContainer.ports = container.ports;
-                if (container.securityContext) convertedContainer.securityContext = container.securityContext;
-
-                return convertedContainer;
-            });
-
-            const podSpec: any = {
-                containers: containers,
-                restartPolicy: spec.restartPolicy || 'Never'
-            };
-
-            // Add optional fields if present
-            if (spec.terminationGracePeriodSeconds !== undefined) {
-                podSpec.terminationGracePeriodSeconds = spec.terminationGracePeriodSeconds;
-            }
-            if (spec.activeDeadlineSeconds !== undefined) {
-                podSpec.activeDeadlineSeconds = spec.activeDeadlineSeconds;
-            }
-            if (spec.nodeSelector) {
-                podSpec.nodeSelector = spec.nodeSelector;
-            }
-            if (spec.tolerations) {
-                podSpec.tolerations = spec.tolerations;
-            }
-            if (spec.affinity) {
-                podSpec.affinity = spec.affinity;
-            }
-            if (spec.volumes) {
-                podSpec.volumes = spec.volumes;
-            }
-            if (spec.imagePullSecrets) {
-                podSpec.imagePullSecrets = spec.imagePullSecrets;
-            }
-
-            console.log('[Armada] Converted podSpec:', JSON.stringify(podSpec, null, 2));
-            return podSpec;
-        }) : [];
-
-        const result = {
-            priority: job.priority || 0,
-            namespace: job.namespace || 'default',
-            client_id: job.clientId || '',
-            labels: job.labels || {},
-            annotations: job.annotations || {},
-            pod_specs: podSpecs
-        };
-
-        console.log('[Armada] Final proto job:', JSON.stringify(result, null, 2));
         return result;
     }
 
@@ -809,7 +1021,10 @@ export class ArmadaClient {
         const binocularsClient = this.getBinocularsClientForCluster(clusterId);
 
         if (!binocularsClient) {
-            throw new Error(`Could not create Binoculars client for cluster "${clusterId}". Check your configuration.`);
+            throw new Error(
+                this.binocularsUrlError
+                    ?? `Could not create Binoculars client for cluster "${clusterId}". Check your configuration.`
+            );
         }
 
         return new Promise((resolve, reject) => {
