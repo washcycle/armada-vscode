@@ -1,0 +1,55 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard"
+  ],
+  "timezone": "UTC",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 10,
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "platformAutomerge": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "addLabels": ["automerge"]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "addLabels": ["security"]
+  },
+  "packageRules": [
+    {
+      "description": "Group all non-major npm updates into one weekly PR and auto-merge it once required checks pass",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "non-major npm dependencies",
+      "groupSlug": "npm-non-major",
+      "automerge": true,
+      "addLabels": ["automerge"]
+    },
+    {
+      "description": "Group and auto-merge non-major GitHub Actions updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "groupName": "GitHub Actions",
+      "groupSlug": "github-actions-non-major",
+      "automerge": true,
+      "addLabels": ["automerge"]
+    },
+    {
+      "description": "Major updates always need a human review",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "addLabels": ["major"]
+    },
+    {
+      "description": "@types/vscode must not exceed engines.vscode or vsce refuses to package; bump both together by hand",
+      "matchPackageNames": ["@types/vscode"],
+      "allowedVersions": "<1.110.0"
+    }
+  ]
+}
