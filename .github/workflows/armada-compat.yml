@@ -1,0 +1,139 @@
+name: Armada Compatibility
+
+# Regression-tests the extension against newer Armada releases than the
+# pinned baseline used by the nightly Integration Tests workflow.
+#
+# - Scheduled weekly: tests the pinned baseline plus the newest N stable
+#   Armada releases that have published images.
+# - Manual: pass an explicit comma-separated list of versions, or leave it
+#   empty to use the same auto-discovery as the schedule.
+#
+# Each version runs the full integration suite (kind + Helm + operator) via
+# the reusable integration-tests.yml workflow.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'   # Mondays 04:00 UTC (after the nightly run)
+  workflow_dispatch:
+    inputs:
+      versions:
+        description: 'Comma-separated Armada versions, e.g. "0.22.16,0.21.0" (empty = auto: baseline + newest releases)'
+        required: false
+        type: string
+      latest_count:
+        description: 'How many of the newest releases to test when auto-discovering'
+        required: false
+        default: '2'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: armada-compat
+  cancel-in-progress: true
+
+env:
+  # Keep in sync with the default in integration-tests.yml
+  BASELINE_VERSION: '0.20.28'
+
+jobs:
+  resolve-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.resolve.outputs.versions }}
+    steps:
+      - name: Resolve Armada versions to test
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSIONS: ${{ inputs.versions }}
+          LATEST_COUNT: ${{ inputs.latest_count || '2' }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${INPUT_VERSIONS:-}" ]; then
+            # Normalise: split on commas/whitespace, strip a leading "v".
+            candidates=$(echo "$INPUT_VERSIONS" | tr ', ' '\n\n' | sed -e 's/^v//' -e '/^$/d')
+          else
+            # Newest stable (non-draft, non-prerelease) semver releases.
+            latest=$(gh api 'repos/armadaproject/armada/releases?per_page=30' \
+              --jq '.[] | select(.draft == false and .prerelease == false) | .tag_name' \
+              | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+              | sed 's/^v//' \
+              | sort -V -r \
+              | head -n "$LATEST_COUNT")
+            candidates=$(printf '%s\n%s\n' "$BASELINE_VERSION" "$latest")
+          fi
+
+          # Only keep versions whose images AND armadactl binary were actually
+          # published; a release without artifacts would fail for reasons that
+          # say nothing about the extension.
+          images="armada-server armada-scheduler armada-event-ingester armada-executor armada-lookout"
+          selected=()
+          for v in $(echo "$candidates" | sort -V -u); do
+            ok=true
+            for img in $images; do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "https://hub.docker.com/v2/repositories/gresearch/${img}/tags/${v}")
+              if [ "$code" != "200" ]; then
+                echo "::warning::Skipping ${v}: image gresearch/${img}:${v} not found (HTTP ${code})"
+                ok=false; break
+              fi
+            done
+            if $ok; then
+              code=$(curl -s -o /dev/null -L -w '%{http_code}' \
+                "https://github.com/armadaproject/armada/releases/download/v${v}/armadactl_${v}_linux_amd64.tar.gz")
+              if [ "$code" != "200" ]; then
+                echo "::warning::Skipping ${v}: armadactl ${v} release asset not found (HTTP ${code})"
+                ok=false
+              fi
+            fi
+            $ok && selected+=("$v")
+          done
+
+          if [ ${#selected[@]} -eq 0 ]; then
+            echo "::error::No testable Armada versions resolved"
+            exit 1
+          fi
+
+          json=$(printf '%s\n' "${selected[@]}" | jq -R . | jq -cs .)
+          echo "versions=${json}" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Armada versions under test"
+            printf -- '- `%s`\n' "${selected[@]}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  regression:
+    needs: resolve-versions
+    name: Armada ${{ matrix.armada_version }}
+    strategy:
+      fail-fast: false
+      # Each leg spins up a full kind cluster; keep runner load reasonable.
+      max-parallel: 3
+      matrix:
+        armada_version: ${{ fromJSON(needs.resolve-versions.outputs.versions) }}
+    uses: ./.github/workflows/integration-tests.yml
+    with:
+      armada_version: ${{ matrix.armada_version }}
+
+  report:
+    needs: [resolve-versions, regression]
+    if: always() && needs.resolve-versions.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarise results
+        env:
+          RESULT: ${{ needs.regression.result }}
+          VERSIONS: ${{ needs.resolve-versions.outputs.versions }}
+        run: |
+          {
+            echo "### Armada compatibility result: \`${RESULT}\`"
+            echo
+            echo "Versions: \`${VERSIONS}\`"
+            echo
+            echo "See the individual **Armada <version>** jobs above for per-version results."
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$RESULT" != "success" ]; then
+            echo "::error::One or more Armada versions failed the integration suite"
+            exit 1
+          fi
