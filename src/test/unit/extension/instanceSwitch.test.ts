@@ -13,10 +13,9 @@ import * as net from 'net';
 import * as os from 'os';
 import * as path from 'path';
 import { vscodeMock, mockState, FakeWebviewPanel } from '../vscodeMock';
-import { activateWithConfig, Activated, runCommand, eventually } from '../support/activation';
+import { activateWithConfig, Activated, runCommand, eventually, makeMemento } from '../support/activation';
 import { startGrpcPair, GrpcPair } from '../support/connectionFixtures';
 import { tlsFixture } from '../setup/tlsFixture';
-import { knownBug } from '../support/knownBug';
 
 /** A port that was free a moment ago and has nothing listening on it. */
 function closedPort(): Promise<number> {
@@ -121,13 +120,17 @@ describe('Switching between Armada instances', function () {
         assert.strictEqual(mockState.panels.length, 1, 'singleton panel reused');
     });
 
-    knownBug('armada-vscode-lj1', 'an already-open config panel follows the switch without being re-opened', async () => {
+    // Regression test for armada-vscode-lj1.
+    it('an already-open config panel follows the switch without being re-opened', async () => {
         await runCommand('armada.showConfig');
         const panel = mockState.panels[0];
+        const revealsBefore = panel.revealCount;
         await runCommand('armada.switchContext', 'gamma');
-        assert.ok(panel.webview.html.includes(`127.0.0.1:${gamma.armadaPort}`), 'panel still shows the previous instance');
+        assert.ok(panel.webview.html.includes(`127.0.0.1:${gamma.armadaPort}`), 'panel shows the new instance');
+        assert.strictEqual(panel.revealCount, revealsBefore, 'refresh does not steal focus');
         await panel.receive({ command: 'testConnection' });
-        assert.strictEqual(gamma.metadata.length, 1, 'Test Connection still probes the previous instance');
+        assert.strictEqual(gamma.metadata.length, 1, 'Test Connection probes the new instance');
+        assert.strictEqual(alpha.metadata.length, 0, 'and not the previous one');
     });
 
     it('status bar reflects each instance’s own health, with no stale state carried over', async () => {
@@ -163,13 +166,40 @@ describe('Switching between Armada instances', function () {
         await eventually(() => alpha.events[0].cancelled, 3000, 'alpha stream cancelled');
     });
 
-    knownBug('armada-vscode-rke', 'job sets monitored on the old instance are not replayed against the new one', async () => {
+    // Regression tests for armada-vscode-rke.
+    it('job sets monitored on the old instance are not replayed against the new one', async () => {
         await loadJobSet('q', 'set-a');
         await eventually(() => alpha.events.length === 1, 3000, 'alpha subscription');
         await runCommand('armada.switchContext', 'gamma');
         // Give any replay a chance to happen.
         await new Promise(r => setTimeout(r, 500));
         assert.deepStrictEqual(gamma.events.map(e => e.jobSetId), [], 'alpha\'s job set was subscribed on gamma');
+    });
+
+    it('each instance keeps its own monitored job sets across switches', async () => {
+        await loadJobSet('q', 'set-a');
+        await runCommand('armada.switchContext', 'gamma');
+        await loadJobSet('q', 'set-g');
+        await eventually(() => gamma.events.some(e => e.jobSetId === 'set-g'), 3000, 'gamma subscription');
+        await runCommand('armada.switchContext', 'alpha');
+        await eventually(() => alpha.events.filter(e => e.jobSetId === 'set-a' && !e.cancelled).length === 1, 3000, 'alpha restored');
+        assert.ok(!alpha.events.some(e => e.jobSetId === 'set-g'), 'gamma\'s job set must not reach alpha');
+    });
+
+    it('migrates the legacy shared list to the first active instance only', async () => {
+        ext.dispose();
+        const workspaceState = makeMemento();
+        await workspaceState.update('armada.monitoredJobSets', [{ queue: 'q', jobSetId: 'set-legacy', addedAt: '2026-01-01T00:00:00Z' }]);
+        for (const s of [alpha, beta, gamma]) { s.events.length = 0; }
+        ext = await activateWithConfig(configPath, {}, { workspaceState });
+
+        await eventually(() => alpha.events.some(e => e.jobSetId === 'set-legacy'), 3000, 'legacy list restored on alpha');
+        assert.strictEqual(workspaceState.get('armada.monitoredJobSets'), undefined, 'legacy key removed');
+        assert.ok(Array.isArray(workspaceState.get(`armada.monitoredJobSets:localhost:${alpha.armadaPort}`)), 'adopted under alpha\'s key');
+
+        await runCommand('armada.switchContext', 'gamma');
+        await new Promise(r => setTimeout(r, 500));
+        assert.ok(!gamma.events.some(e => e.jobSetId === 'set-legacy'), 'legacy list not replayed on gamma');
     });
 
     it('switching back restores monitoring on the original instance', async () => {
