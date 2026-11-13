@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.6.0...armada-vscode-v1.0.0) (2026-11-13)
+
+
+### ⚠ BREAKING CHANGES
+
+* **grpc:** normalise endpoint URLs and match armadactl's TLS default ([#91](https://github.com/washcycle/armada-vscode/issues/91))
+
+### Bug Fixes
+
+* **config:** serialise config writes so rapid context switches persist the last context ([#98](https://github.com/washcycle/armada-vscode/issues/98)) ([4a25fa7](https://github.com/washcycle/armada-vscode/commit/4a25fa764a767ac7cb07d0eb2d54f80995f2dde7))
+* **deps:** re-apply security updates dropped with Dependabot [#89](https://github.com/washcycle/armada-vscode/issues/89) ([#96](https://github.com/washcycle/armada-vscode/issues/96)) ([0856a94](https://github.com/washcycle/armada-vscode/commit/0856a94919c381aa71872f43f14fab44b491f6ee))
+* **extension:** keep monitored job sets and the config panel tied to the active instance ([#94](https://github.com/washcycle/armada-vscode/issues/94)) ([1669dd9](https://github.com/washcycle/armada-vscode/commit/1669dd96f1078ae8a93fb813c79a8e5461021407))
+* **grpc:** add deadlines so unreachable hosts fail instead of hanging ([#92](https://github.com/washcycle/armada-vscode/issues/92)) ([ffcceab](https://github.com/washcycle/armada-vscode/commit/ffcceab17fec301eae8f4602a976381b05f8861f))
+* **grpc:** normalise endpoint URLs and match armadactl's TLS default ([#91](https://github.com/washcycle/armada-vscode/issues/91)) ([7ad5de4](https://github.com/washcycle/armada-vscode/commit/7ad5de48168dada592461b3ebc3d393fde7be749))
+* **lookout:** decode UTF-8 safely, handle IPv6, status codes, timeouts and scheme-less URLs ([#93](https://github.com/washcycle/armada-vscode/issues/93)) ([13398a8](https://github.com/washcycle/armada-vscode/commit/13398a89aff2892bacc8ee92707c3b98b9ce4ec2))
+* **panel:** don't throw in the config panel when no config is loaded ([#95](https://github.com/washcycle/armada-vscode/issues/95)) ([b3d453e](https://github.com/washcycle/armada-vscode/commit/b3d453ec7c5923f49e565f5617447164931241f1))
+
 ## [0.6.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.3...armada-vscode-v0.6.0) (2026-11-13)
 
 
