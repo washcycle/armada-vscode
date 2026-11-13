@@ -4,27 +4,51 @@ on:
   schedule:
     - cron: '0 2 * * *'   # nightly at 2am UTC
   workflow_dispatch:
+    inputs:
+      armada_version:
+        description: 'Armada release to test against, without the leading "v" (empty = pinned baseline)'
+        required: false
+        type: string
+      armada_operator_version:
+        description: 'Armada operator image tag (empty = pinned baseline)'
+        required: false
+        type: string
+  # Reusable entry point — used by armada-compat.yml to run this suite against
+  # newer Armada releases. Defaults below keep the nightly run on the pinned baseline.
+  workflow_call:
+    inputs:
+      armada_version:
+        description: 'Armada release to test against, without the leading "v" (empty = pinned baseline)'
+        required: false
+        type: string
+      armada_operator_version:
+        description: 'Armada operator image tag (empty = pinned baseline)'
+        required: false
+        type: string
 
 concurrency:
-  group: integration-test
+  # Per-version group so a compatibility matrix doesn't cancel its own legs.
+  group: integration-test-${{ github.workflow }}-${{ inputs.armada_version || 'pinned' }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
-# All Docker images used in CI — pinned for cacheability and reproducibility
+# All Docker images used in CI — pinned for cacheability and reproducibility.
+# Armada / operator versions can be overridden via workflow inputs.
 env:
   KIND_NODE_IMAGE: kindest/node:v1.29.2
   POSTGRES_IMAGE: postgres:17-alpine
   PULSAR_IMAGE: apachepulsar/pulsar:3.3.2
   REDIS_IMAGE: redis:7.4-alpine
   KUBE_RBAC_PROXY_IMAGE: registry.k8s.io/kubebuilder/kube-rbac-proxy:v0.16.0
-  ARMADA_OPERATOR_IMAGE: gresearch/armada-operator:0.6.0
-  ARMADA_SERVER_IMAGE: gresearch/armada-server:0.20.28
-  ARMADA_SCHEDULER_IMAGE: gresearch/armada-scheduler:0.20.28
-  ARMADA_EVENT_INGESTER_IMAGE: gresearch/armada-event-ingester:0.20.28
-  ARMADA_EXECUTOR_IMAGE: gresearch/armada-executor:0.20.28
-  ARMADA_LOOKOUT_IMAGE: gresearch/armada-lookout:0.20.28
+  ARMADACTL_VERSION: ${{ inputs.armada_version || '0.20.28' }}
+  ARMADA_OPERATOR_IMAGE: gresearch/armada-operator:${{ inputs.armada_operator_version || '0.6.0' }}
+  ARMADA_SERVER_IMAGE: gresearch/armada-server:${{ inputs.armada_version || '0.20.28' }}
+  ARMADA_SCHEDULER_IMAGE: gresearch/armada-scheduler:${{ inputs.armada_version || '0.20.28' }}
+  ARMADA_EVENT_INGESTER_IMAGE: gresearch/armada-event-ingester:${{ inputs.armada_version || '0.20.28' }}
+  ARMADA_EXECUTOR_IMAGE: gresearch/armada-executor:${{ inputs.armada_version || '0.20.28' }}
+  ARMADA_LOOKOUT_IMAGE: gresearch/armada-lookout:${{ inputs.armada_version || '0.20.28' }}
   # Cache key version — bump to invalidate image cache
   IMAGE_CACHE_VERSION: v1
 
@@ -55,7 +79,7 @@ jobs:
             /usr/local/bin/kubectl
             /usr/local/bin/kind
             /usr/local/bin/armadactl
-          key: cli-tools-${{ runner.os }}-kubectl-latest-kind-0.20.0-armadactl-0.20.28
+          key: cli-tools-${{ runner.os }}-kubectl-latest-kind-0.20.0-armadactl-${{ env.ARMADACTL_VERSION }}
           restore-keys: |
             cli-tools-${{ runner.os }}-
 
@@ -287,9 +311,10 @@ jobs:
 
       - name: Install armadactl
         run: |
-          if [ ! -f /usr/local/bin/armadactl ]; then
-            echo "Installing armadactl from GitHub releases..."
-            ARMADACTL_VERSION="0.20.28"
+          # restore-keys may hand back a cache holding a different armadactl
+          # version, so check the version, not just whether the binary exists.
+          if ! /usr/local/bin/armadactl version 2>/dev/null | grep -q "$ARMADACTL_VERSION"; then
+            echo "Installing armadactl ${ARMADACTL_VERSION} from GitHub releases..."
             curl -L "https://github.com/armadaproject/armada/releases/download/v${ARMADACTL_VERSION}/armadactl_${ARMADACTL_VERSION}_linux_amd64.tar.gz" -o armadactl.tar.gz
             tar -xzf armadactl.tar.gz
             chmod +x armadactl
