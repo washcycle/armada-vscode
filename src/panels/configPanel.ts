@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ResolvedConfig } from '../types/config';
 import { ArmadaClient } from '../grpc/armadaClient';
+import { describeTlsMode } from '../grpc/endpoint';
 
 const SECRET_KEY_PATTERN = /password|token|secret|key/i;
 
@@ -132,7 +133,7 @@ export class ConfigPanel {
 
         const ctx = config.currentContext || 'default';
 
-        const tls = config.forceNoTls ? 'Disabled (forceNoTls)' : 'Enabled (auto-detect)';
+        const tls = describeTlsMode(config.armadaUrl, config.forceNoTls);
 
         const connectionRows = `
             <div class="row">
@@ -288,15 +289,19 @@ ${body}
 <script nonce="${nonce}">
   const vscode = acquireVsCodeApi();
 
-  document.getElementById('testBtn').addEventListener('click', () => {
-    const btn = document.getElementById('testBtn');
-    const spinner = document.getElementById('spinner');
-    const result = document.getElementById('testResult');
-    btn.disabled = true;
-    spinner.classList.remove('hidden');
-    result.className = 'hidden';
-    vscode.postMessage({ command: 'testConnection' });
-  });
+  // The not-configured view has no Test Connection controls, so every lookup
+  // below tolerates their absence instead of throwing.
+  const testBtn = document.getElementById('testBtn');
+  if (testBtn) {
+    testBtn.addEventListener('click', () => {
+      const spinner = document.getElementById('spinner');
+      const result = document.getElementById('testResult');
+      testBtn.disabled = true;
+      if (spinner) { spinner.classList.remove('hidden'); }
+      if (result) { result.className = 'hidden'; }
+      vscode.postMessage({ command: 'testConnection' });
+    });
+  }
 
   document.querySelectorAll('.inline-btn[data-key]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -319,6 +324,7 @@ ${body}
       const btn = document.getElementById('testBtn');
       const spinner = document.getElementById('spinner');
       const result = document.getElementById('testResult');
+      if (!btn || !spinner || !result) { return; }
       btn.disabled = false;
       spinner.classList.add('hidden');
       if (msg.ok) {

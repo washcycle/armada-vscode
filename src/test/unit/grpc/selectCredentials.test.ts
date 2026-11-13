@@ -83,15 +83,19 @@ describe('selectCredentials', () => {
         expectCredentialType('armada.example.com:443', false, true);
     });
 
-    it('returns insecure credentials for a non-443 port without scheme', () => {
-        expectCredentialType('armada.example.com:50051', undefined, false);
+    it('returns SSL credentials for a non-local host:port without scheme (armadactl default)', () => {
+        expectCredentialType('armada.example.com:50051', undefined, true);
     });
 
-    it('does not match port 1443 as TLS', () => {
-        expectCredentialType('armada.example.com:1443', undefined, false);
+    it('returns insecure credentials for an explicit http:// remote host', () => {
+        expectCredentialType('http://armada.example.com:50051', undefined, false);
     });
 
-    it('does not match port 4430 as TLS', () => {
-        expectCredentialType('armada.example.com:4430', undefined, false);
+    it('does not match port 1443 as 443 (localhost stays plaintext)', () => {
+        expectCredentialType('localhost:1443', undefined, false);
+    });
+
+    it('does not match port 4430 as 443 (localhost stays plaintext)', () => {
+        expectCredentialType('localhost:4430', undefined, false);
     });
 });

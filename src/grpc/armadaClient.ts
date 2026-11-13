@@ -8,31 +8,18 @@ import * as protobuf from 'protobufjs';
 import { buildAuthHeader, isSecureCredentials, makeAuthInterceptor, withCallCredentials } from './auth';
 import { buildTrustStore, countCertificates, describeCertificateError, resolveCertPath } from './caCerts';
 import { ConversionReport, convertJobItem } from './podSpecConverter';
+import { formatHostPort, parseEndpoint, usesTls } from './endpoint';
 
 /**
- * Strip any `http://` or `https://` scheme prefix from a URL so that the
- * result can be used as a bare `host:port` gRPC target string.
+ * Turn a user-supplied endpoint into a bare gRPC target (`host:port`).
+ * Tolerates a case-insensitive scheme, whitespace, trailing slashes/paths,
+ * IPv6 literals and `dns:` targets (see `parseEndpoint`).
  */
 export function stripScheme(url: string): string {
-    return url.replace(/^https?:\/\//, '');
+    return parseEndpoint(url)?.target ?? url.trim();
 }
 
-/**
- * Whether a given endpoint will be dialed over TLS: an `https://` scheme or a
- * `:443` port, unless `forceNoTls` overrides it.
- *
- * Exposed separately from `selectCredentials` so callers can branch on the
- * transport without building (and, for TLS, loading root certs into) a
- * credentials object.
- */
-export function usesTls(url: string, forceNoTls?: boolean): boolean {
-    if (forceNoTls) {
-        return false;
-    }
-    // Strip the scheme and path, then check whether the host:port portion ends with :443
-    const hostPort = url.replace(/^https?:\/\//, '').split('/')[0];
-    return url.startsWith('https://') || hostPort.endsWith(':443');
-}
+export { usesTls };
 
 /**
  * Guess the Binoculars endpoint from the Armada endpoint.
@@ -52,15 +39,12 @@ export function usesTls(url: string, forceNoTls?: boolean): boolean {
  * caller can tell the user which setting is missing.
  */
 export function deriveBinocularsUrl(armadaUrl: string): { url: string | null; reason: string } {
-    const urlMatch = armadaUrl.match(/^(?:(https?):\/\/)?([^:/]+)(?::(\d+))?$/);
-    if (!urlMatch) {
+    const ep = parseEndpoint(armadaUrl);
+    if (!ep) {
         return { url: null, reason: `Could not parse the Armada URL "${armadaUrl}" to derive a Binoculars URL.` };
     }
 
-    const [, scheme, host, portText] = urlMatch;
-    const port = portText ? parseInt(portText, 10) : null;
-
-    if (scheme === 'https' || port === 443) {
+    if (ep.scheme === 'https' || ep.port === 443) {
         return {
             url: null,
             reason: `Cannot infer a Binoculars URL from the TLS endpoint "${armadaUrl}", because ` +
@@ -70,7 +54,7 @@ export function deriveBinocularsUrl(armadaUrl: string): { url: string | null; re
         };
     }
 
-    if (!port) {
+    if (ep.port === undefined) {
         return {
             url: null,
             reason: `The Armada URL "${armadaUrl}" has no port, so a Binoculars URL cannot be derived. ` +
@@ -78,14 +62,16 @@ export function deriveBinocularsUrl(armadaUrl: string): { url: string | null; re
         };
     }
 
-    return { url: `${host}:${port + 2}`, reason: '' };
+    // Keep an explicit http:// so the derived endpoint makes the same TLS
+    // decision as the Armada endpoint it came from.
+    const prefix = ep.scheme === 'http' ? 'http://' : '';
+    return { url: `${prefix}${formatHostPort(ep.host, ep.port + 2)}`, reason: '' };
 }
 
 /**
- * Select gRPC channel credentials for a given endpoint URL.
- * Returns SSL credentials when the URL uses an `https://` scheme or targets
- * port 443.  Passing `forceNoTls: true` always returns insecure credentials
- * regardless of the URL (useful for development / plain-text servers).
+ * Select gRPC channel credentials for a given endpoint URL, following the
+ * TLS policy in `usesTls` (armadactl parity: TLS unless forceNoTls, an
+ * explicit http:// scheme, or a localhost/loopback host).
  */
 export function selectCredentials(
     url: string,
@@ -215,7 +201,7 @@ export class ArmadaClient {
 
         // Priority 1: Use pattern if available
         if (this.config.binocularsUrlPattern) {
-            binocularsUrl = this.config.binocularsUrlPattern.replace('{CLUSTER_ID}', clusterId);
+            binocularsUrl = this.config.binocularsUrlPattern.split('{CLUSTER_ID}').join(clusterId);
             console.log(`[Armada] Using binocularsUrlPattern for cluster "${clusterId}":`, binocularsUrl);
         }
         // Priority 2: Use explicit URL
@@ -251,7 +237,7 @@ export class ArmadaClient {
         const binocularsPackageDefinition = protoLoader.loadSync(binocularsProtoPath, protoOptions);
         const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
         const client = new binocularsProto.binoculars.Binoculars(
-            binocularsUrl,
+            stripScheme(binocularsUrl),
             this.getCredentials(binocularsUrl),
             this.clientOptionsFor(binocularsUrl)
         );
@@ -486,7 +472,7 @@ export class ArmadaClient {
             const binocularsPackageDefinition = protoLoader.loadSync(binocularsProtoPath, protoOptions);
             const binocularsProto = grpc.loadPackageDefinition(binocularsPackageDefinition) as any;
             this.binocularsClient = new binocularsProto.binoculars.Binoculars(
-                binocularsUrl,
+                stripScheme(binocularsUrl),
                 this.getCredentials(binocularsUrl),
                 this.clientOptionsFor(binocularsUrl)
             );
