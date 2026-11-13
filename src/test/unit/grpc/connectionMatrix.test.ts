@@ -102,14 +102,14 @@ describe('Connection matrix (real gRPC, non-default ports)', function () {
             assert.strictEqual(result.ok, false);
         });
 
-        knownBug('armada-vscode-6ts', 'trailing slash http://localhost:port/ connects', () =>
+        it('trailing slash http://localhost:port/ connects', () =>
             expectConnects({ armadaUrl: `http://localhost:${plain.armadaPort}/` }));
-        knownBug('armada-vscode-6ts', 'uppercase HTTP:// scheme connects', () =>
+        it('uppercase HTTP:// scheme connects', () =>
             expectConnects({ armadaUrl: `HTTP://localhost:${plain.armadaPort}` }));
-        knownBug('armada-vscode-6ts', 'surrounding whitespace is tolerated', () =>
+        it('surrounding whitespace is tolerated', () =>
             expectConnects({ armadaUrl: ` localhost:${plain.armadaPort} ` }));
-        knownBug('armada-vscode-6ts', 'https:// with trailing slash connects', async () => {
-            if (!secure) { throw new Error('no TLS fixture'); }
+        it('https:// with trailing slash connects', async function () {
+            if (!secure) { this.skip(); }
             await expectConnects({ armadaUrl: `https://localhost:${secure.armadaPort}/` });
         });
     });
@@ -131,10 +131,10 @@ describe('Connection matrix (real gRPC, non-default ports)', function () {
         it('localhost:port → plaintext', () => assert.strictEqual(isSecure(selectCredentials('localhost:50051')), false));
         it('forceNoTls → plaintext', () => assert.strictEqual(isSecure(selectCredentials('https://armada.example.com', true)), false));
 
-        knownBug('armada-vscode-woy', 'non-localhost host:port defaults to TLS like armadactl', () => {
+        it('non-localhost host:port defaults to TLS like armadactl', () => {
             assert.strictEqual(isSecure(selectCredentials('armada.example.com:50051')), true);
         });
-        knownBug('armada-vscode-woy', 'scheme check is case-insensitive (HTTPS://)', () => {
+        it('scheme check is case-insensitive (HTTPS://)', () => {
             assert.strictEqual(isSecure(selectCredentials('HTTPS://armada.example.com:8443')), true);
         });
     });
@@ -154,18 +154,18 @@ describe('Connection matrix (real gRPC, non-default ports)', function () {
             assert.strictEqual(await logsServedBy({ armadaUrl: `localhost:${plain.armadaPort}`, binocularsUrlPattern: 'localhost:{CLUSTER_ID}' }, String(plain.binocularsPort)), 'binoculars-plain');
         });
 
-        knownBug('armada-vscode-cnh', 'explicit http:// binocularsUrl', async () => {
+        it('explicit http:// binocularsUrl', async () => {
             assert.strictEqual(await logsServedBy({ armadaUrl: `localhost:${plain.armadaPort}`, binocularsUrl: `http://localhost:${plain.binocularsPort}` }, 'c1'), 'binoculars-plain');
         });
-        knownBug('armada-vscode-cnh', 'explicit https:// binocularsUrl', async () => {
-            if (!secure) { throw new Error('no TLS fixture'); }
+        it('explicit https:// binocularsUrl', async function () {
+            if (!secure) { this.skip(); }
             assert.strictEqual(await logsServedBy({ armadaUrl: `localhost:${plain.armadaPort}`, binocularsUrl: `https://localhost:${secure.binocularsPort}` }, 'c1'), 'binoculars-tls');
         });
-        knownBug('armada-vscode-cnh', 'http:// binocularsUrlPattern', async () => {
+        it('http:// binocularsUrlPattern', async () => {
             assert.strictEqual(await logsServedBy({ armadaUrl: `localhost:${plain.armadaPort}`, binocularsUrlPattern: 'http://localhost:{CLUSTER_ID}' }, String(plain.binocularsPort)), 'binoculars-plain');
         });
-        knownBug('armada-vscode-cnh', 'https:// binocularsUrlPattern', async () => {
-            if (!secure) { throw new Error('no TLS fixture'); }
+        it('https:// binocularsUrlPattern', async function () {
+            if (!secure) { this.skip(); }
             assert.strictEqual(await logsServedBy({ armadaUrl: `localhost:${plain.armadaPort}`, binocularsUrlPattern: 'https://localhost:{CLUSTER_ID}' }, String(secure.binocularsPort)), 'binoculars-tls');
         });
         it('refuses to guess a Binoculars URL for a TLS endpoint and names the setting to add', async function () {
@@ -177,11 +177,11 @@ describe('Connection matrix (real gRPC, non-default ports)', function () {
                 /binocularsUrl/
             );
         });
-        knownBug('armada-vscode-cnh', 'derivation tolerates a trailing slash', async () => {
+        it('derivation tolerates a trailing slash', async () => {
             assert.strictEqual(await logsServedBy({ armadaUrl: `http://localhost:${plain.armadaPort}/` }, 'c1'), 'binoculars-plain');
         });
-        knownBug('armada-vscode-cnh', 'derivation handles IPv6 [::1]:port', async () => {
-            if (!plain.ipv6) { throw new Error('no IPv6'); }
+        it('derivation handles IPv6 [::1]:port', async function () {
+            if (!plain.ipv6) { this.skip(); }
             assert.strictEqual(await logsServedBy({ armadaUrl: `[::1]:${plain.armadaPort}` }, 'c1'), 'binoculars-plain');
         });
     });
