@@ -147,7 +147,7 @@ describe('ConfigPanel webview (Playwright)', function () {
             assert.match(r.text, /^✗ /);
         });
 
-        knownBug('armada-vscode-6ts', 'trailing slash URL connects from the panel', async () => {
+        it('trailing slash URL connects from the panel', async () => {
             const { page } = await mount(cfg(`http://localhost:${plain.armadaPort}/`));
             const r = await clickTest(page);
             assert.strictEqual(r.cls, 'ok', r.text);

@@ -39,7 +39,7 @@ Run the command `Armada: Setup Configuration` or create `~/.armadactl.yaml`:
 ```yaml
 currentContext: local
 contexts:
-  - name: local
+  local:
     armadaUrl: localhost:30002
     execTimeout: 2m
 ```
@@ -109,6 +109,28 @@ Configure the extension in VSCode Settings (`File → Preferences → Settings �
 | `armada.refreshInterval` | `5000` | Auto-refresh interval in milliseconds |
 | `armada.maxJobsToShow` | `100` | Maximum number of jobs to display |
 | `armada.caCertPath` | *(empty)* | PEM CA bundle to trust for TLS, in addition to the system roots. See [Corporate networks](#corporate-networks-and-tls-inspecting-proxies) |
+
+### Connection URLs and TLS
+
+`armadaUrl`, `binocularsUrl` and `binocularsUrlPattern` accept `host:port`,
+`http://host:port`, `https://host:port`, IPv6 literals (`[::1]:30002`) and
+gRPC `dns:` targets. Scheme case, surrounding whitespace and trailing slashes
+are ignored.
+
+TLS follows armadactl, so a context shared between both tools behaves the same:
+
+| `armadaUrl` | Transport |
+|---|---|
+| `forceNoTls: true` on the context | plaintext |
+| `https://…` | TLS |
+| `http://…` | plaintext |
+| `…:443` | TLS |
+| `localhost`, `*.localhost`, `127.x.x.x`, `[::1]` | plaintext |
+| anything else, e.g. `armada.example.com:50051` | **TLS** |
+
+To talk plaintext to a remote server, use `http://host:port` or set
+`forceNoTls: true`. The config panel (**Armada: Show Configuration**) shows the
+mode in effect and why.
 
 ### Corporate networks and TLS-inspecting proxies
 
