@@ -39,6 +39,12 @@ jobs:
       - name: Run unit tests
         run: npm run test:unit
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium-headless-shell
+
+      - name: Run webview tests (Playwright)
+        run: npm run test:webview
+
       - name: Install vsce
         run: npm install -g @vscode/vsce
 
