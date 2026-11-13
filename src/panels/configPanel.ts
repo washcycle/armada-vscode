@@ -38,6 +38,18 @@ export class ConfigPanel {
         new ConfigPanel(config, client);
     }
 
+    /**
+     * Point an already-open panel at a new config/client without focusing it.
+     * Called whenever the active client is replaced (context switch, config
+     * reload, setup), so "Test Connection" never probes a previous instance.
+     */
+    static refreshIfOpen(
+        config: ResolvedConfig | null,
+        client: ArmadaClient | undefined
+    ): void {
+        ConfigPanel.instance?.update(config, client);
+    }
+
     private constructor(
         config: ResolvedConfig | null,
         client: ArmadaClient | undefined

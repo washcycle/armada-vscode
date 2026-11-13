@@ -142,3 +142,16 @@ describe('buildJobCountLabel()', () => {
 after(() => {
     uninstallVscodeMock();
 });
+
+describe('monitoredJobSetsKey()', () => {
+    const { monitoredJobSetsKey } = require('../../../providers/jobTreeProvider') as typeof import('../../../providers/jobTreeProvider');
+
+    it('scopes the key to the Armada endpoint', () => {
+        assert.strictEqual(monitoredJobSetsKey('localhost:30002'), 'armada.monitoredJobSets:localhost:30002');
+        assert.notStrictEqual(monitoredJobSetsKey('a.example:1'), monitoredJobSetsKey('b.example:1'));
+    });
+
+    it('ignores case and surrounding whitespace so the same server shares one list', () => {
+        assert.strictEqual(monitoredJobSetsKey(' Armada.Example.com:50051 '), monitoredJobSetsKey('armada.example.com:50051'));
+    });
+});

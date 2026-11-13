@@ -139,6 +139,11 @@ export class ArmadaClient {
         this.config = config;
     }
 
+    /** The Armada endpoint this client talks to, as configured. */
+    get armadaUrl(): string {
+        return this.config.armadaUrl;
+    }
+
     private updateConnectionState(state: ConnectionState, detail?: string): void {
         if (state === this.connectionState) { return; }
         this.connectionState = state;

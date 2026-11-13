@@ -8,6 +8,18 @@ interface MonitoredJobSet {
     addedAt: string;
 }
 
+/** Pre-0.6 key: one list shared by every context, which replayed job sets against the wrong instance. */
+const LEGACY_MONITORED_KEY = 'armada.monitoredJobSets';
+
+/**
+ * Workspace-state key for the job sets monitored on one Armada instance.
+ * Job sets belong to a server, so the key is the endpoint rather than the
+ * context name: two contexts for the same server share their list.
+ */
+export function monitoredJobSetsKey(armadaUrl: string): string {
+    return `${LEGACY_MONITORED_KEY}:${armadaUrl.trim().toLowerCase()}`;
+}
+
 export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
     private _onDidChangeTreeData: vscode.EventEmitter<TreeItem | undefined | null | void> = new vscode.EventEmitter<TreeItem | undefined | null | void>();
     readonly onDidChangeTreeData: vscode.Event<TreeItem | undefined | null | void> = this._onDidChangeTreeData.event;
@@ -162,7 +174,10 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
             });
         }
 
-        await this.context.workspaceState.update('armada.monitoredJobSets', monitored);
+        if (!this.client) {
+            return;
+        }
+        await this.context.workspaceState.update(monitoredJobSetsKey(this.client.armadaUrl), monitored);
         console.log('[Armada] Saved', monitored.length, 'monitored job sets to workspace state');
     }
 
@@ -174,7 +189,20 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
             return;
         }
 
-        const monitored = this.context.workspaceState.get<MonitoredJobSet[]>('armada.monitoredJobSets', []);
+        const client = this.client;
+        const key = monitoredJobSetsKey(client.armadaUrl);
+        let monitored = this.context.workspaceState.get<MonitoredJobSet[]>(key);
+
+        if (monitored === undefined) {
+            // One-time migration: the old shared list is adopted by whichever
+            // instance is active first, then removed so no other instance replays it.
+            const legacy = this.context.workspaceState.get<MonitoredJobSet[]>(LEGACY_MONITORED_KEY);
+            monitored = legacy ?? [];
+            if (legacy !== undefined) {
+                await this.context.workspaceState.update(key, legacy);
+                await this.context.workspaceState.update(LEGACY_MONITORED_KEY, undefined);
+            }
+        }
 
         if (monitored.length === 0) {
             console.log('[Armada] No saved job sets to restore');
@@ -184,6 +212,12 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
         console.log('[Armada] Restoring', monitored.length, 'monitored job sets...');
 
         for (const jobSet of monitored) {
+            if (this.client !== client) {
+                // The user switched instances mid-restore: stop, or the rest of
+                // this list would be subscribed against the new server.
+                console.log('[Armada] Client changed during restore; stopping');
+                return;
+            }
             try {
                 await this.loadJobsFromQueue(jobSet.queue, jobSet.jobSetId);
             } catch (error) {
@@ -204,8 +238,8 @@ export class JobTreeProvider implements vscode.TreeDataProvider<TreeItem> {
         this.jobs.clear();
 
         // Clear saved state
-        if (this.context) {
-            await this.context.workspaceState.update('armada.monitoredJobSets', []);
+        if (this.context && this.client) {
+            await this.context.workspaceState.update(monitoredJobSetsKey(this.client.armadaUrl), []);
         }
 
         this.refresh();
