@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.6.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.3...armada-vscode-v0.6.0) (2026-11-13)
+
+
+### Features
+
+* **extension:** add live job count status bar item ([#84](https://github.com/washcycle/armada-vscode/issues/84)) ([c2804c0](https://github.com/washcycle/armada-vscode/commit/c2804c06f4315aea6d7701520b9ca8e89b6530aa))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @types/node from 25.5.0 to 26.1.2 ([#81](https://github.com/washcycle/armada-vscode/issues/81)) ([df65d86](https://github.com/washcycle/armada-vscode/commit/df65d86220d3a457f6292b7d8e789e1242c77b16))
+* **deps-dev:** bump eslint from 10.1.0 to 10.8.0 ([19b24bb](https://github.com/washcycle/armada-vscode/commit/19b24bbd7efcc18ccd41e8542742a248498738e0))
+* **deps:** bump @grpc/proto-loader from 0.8.0 to 0.8.1 ([#80](https://github.com/washcycle/armada-vscode/issues/80)) ([8e5d9ae](https://github.com/washcycle/armada-vscode/commit/8e5d9ae3b33199eb49e2f88843eed2b2beb583cd))
+* **deps:** bump js-yaml from 4.3.0 to 5.2.2 ([b595380](https://github.com/washcycle/armada-vscode/commit/b595380ca2ebbb38c767217c0729f16a5134d4b7))
+* **deps:** bump the npm_and_yarn group across 1 directory with 5 updates ([#90](https://github.com/washcycle/armada-vscode/issues/90)) ([d5b3cb5](https://github.com/washcycle/armada-vscode/commit/d5b3cb57311a240f6ca27d33785a18af308b7a7b))
+* **deps:** switch from Dependabot to Renovate with auto-merge ([#87](https://github.com/washcycle/armada-vscode/issues/87)) ([4817b1c](https://github.com/washcycle/armada-vscode/commit/4817b1c5a1951598f653848d3eec4820ef80825a))
+
+
+### Documentation
+
+* **openspec:** propose corporate proxy support ([#88](https://github.com/washcycle/armada-vscode/issues/88)) ([378d946](https://github.com/washcycle/armada-vscode/commit/378d946509d0a2a1c8f462db11a9a19a9db936e3))
+
 ## [0.5.3](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.5.2...armada-vscode-v0.5.3) (2026-07-28)
 
 
