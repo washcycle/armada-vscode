@@ -11,15 +11,15 @@ const shownErrors: string[] = [];
 installVscodeMock();
 
 // Override window methods to capture messages for assertions
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 (vscodeMock.window as any).showInformationMessage = async (msg: string) => { shownInfo.push(msg); return undefined; };
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 (vscodeMock.window as any).showErrorMessage = async (msg: string) => { shownErrors.push(msg); return undefined; };
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 (vscodeMock.window as any).showQuickPick = async () => undefined; // simulate user cancelling QuickPick
 
 // Import AFTER the mock is in place
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+ 
 const { switchContextCommand } = require('../../../commands/switchContext');
 
 // ---------------------------------------------------------------------------
