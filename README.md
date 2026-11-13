@@ -108,7 +108,8 @@ Configure the extension in VSCode Settings (`File → Preferences → Settings �
 | `armada.autoRefresh` | `true` | Automatically refresh job status |
 | `armada.refreshInterval` | `5000` | Auto-refresh interval in milliseconds |
 | `armada.maxJobsToShow` | `100` | Maximum number of jobs to display |
-| `armada.caCertPath` | *(empty)* | PEM CA bundle to trust for TLS, in addition to the system roots. See [Corporate networks](#corporate-networks-and-tls-inspecting-proxies) |
+| `armada.useSystemCertificates` | `true` | Trust CA certificates from the OS certificate store (Windows store, macOS keychain, Linux system bundle). See [Corporate networks](#corporate-networks-and-vpns) |
+| `armada.caCertPath` | *(empty)* | PEM CA bundle to trust for TLS, in addition to the bundled and OS roots. See [Corporate networks](#corporate-networks-and-vpns) |
 
 ### Connection URLs and TLS
 
@@ -132,14 +133,27 @@ To talk plaintext to a remote server, use `http://host:port` or set
 `forceNoTls: true`. The config panel (**Armada: Show Configuration**) shows the
 mode in effect and why.
 
-### Corporate networks and TLS-inspecting proxies
+### Corporate networks and VPNs
 
-On networks that run a TLS-inspecting proxy (Zscaler, Netskope, or an internal
-CA), the certificate the extension actually receives is re-signed by the proxy.
-Node.js does not ship that CA, so every connection fails — usually as
-`UNAVAILABLE` with a certificate error such as
-`unable to verify the first certificate` or `self signed certificate in certificate chain`.
+#### TLS-inspecting proxies (Zscaler, Netskope, company CAs)
 
+On networks that run a TLS-inspecting proxy, the certificate the extension
+actually receives is re-signed by the proxy's CA. Node.js does not ship that
+CA, so without it every connection fails, usually as `UNAVAILABLE` with
+`unable to verify the first certificate` or
+`self signed certificate in certificate chain`.
+
+**Usually nothing to configure.** IT normally installs the proxy CA in the
+operating system's trust store (the Windows certificate store, the macOS
+keychain, or the Linux system bundle), and the extension trusts that store by
+default (`armada.useSystemCertificates`). The **Armada** output channel
+(`View → Output → Armada`) logs how many OS certificates were added on top of
+the bundled roots. This needs a VS Code build on Node 22.15 or newer; on
+older builds, use `armada.caCertPath` below.
+
+**If the CA is not in the OS store**, or you turned
+`armada.useSystemCertificates` off, point `armada.caCertPath` at your
+organisation's CA bundle:
 Point `armada.caCertPath` at your organisation's CA bundle:
 
 ```jsonc
@@ -149,8 +163,8 @@ Point `armada.caCertPath` at your organisation's CA bundle:
 }
 ```
 
-The bundle is added to Node's built-in root certificates rather than replacing
-them, so publicly-signed endpoints keep working. A leading `~` is expanded.
+The bundle is added to the built-in and OS roots rather than replacing them,
+so publicly-signed endpoints keep working. A leading `~` is expanded.
 
 Both the gRPC connection to the Armada server and the HTTPS connection to
 Lookout use the bundle. Certificate problems are reported in the
@@ -189,6 +203,52 @@ contexts:
     armadaUrl: https://armada.example.com
     caCertPath: ~/certs/corporate-ca.pem
 ```
+
+**The certificate is trusted but calls still fail.** gRPC needs HTTP/2 end to
+end. Some inspection setups do not pass HTTP/2 through, or reset long-lived
+streams (job event watching). The symptoms are `UNAVAILABLE` or
+`Received RST_STREAM` errors without any certificate message. Ask IT to exempt
+the Armada and Binoculars hosts from SSL inspection (an inspection *bypass*
+rule, which still routes the traffic through the proxy). Lookout is plain
+HTTPS and is usually fine inspected.
+
+**Explicit proxies and PAC files.** Lookout requests go through VS Code's own
+networking, so they follow `http.proxy` and the system/PAC proxy settings. The
+gRPC connection to Armada does not; it only honours the lowercase environment
+variables `grpc_proxy`, `https_proxy`, `http_proxy` and `no_proxy` in the
+environment VS Code was started from. Built-in proxy support for gRPC is
+planned (`openspec/changes/corporate-proxy-support`).
+
+#### Tailscale and other VPNs
+
+A server reached over Tailscale is a remote host as far as TLS is concerned,
+so a scheme-less `armadaUrl` uses TLS (see the table above). Pick whichever of
+these matches how the server is exposed:
+
+- **Plaintext over the tailnet.** WireGuard already encrypts the traffic, so
+  this is the simplest option. Use an explicit `http://` scheme (or
+  `forceNoTls: true`) with the MagicDNS name or the `100.x.y.z` address:
+
+  ```yaml
+  contexts:
+    homelab:
+      armadaUrl: http://armada-server:50051
+      binocularsUrl: http://armada-server:50053
+      lookoutUrl: http://armada-server:10000
+  ```
+
+- **HTTPS with a `*.ts.net` name** (Tailscale Serve, or the Tailscale
+  Kubernetes operator's ingress). These certificates come from Let's Encrypt,
+  so they are publicly trusted and need no `caCertPath`. Use
+  `https://<name>.<tailnet>.ts.net`. The proxy in front of Armada must forward
+  HTTP/2, because gRPC does not work over HTTP/1.1. Each service gets its own
+  hostname, so set `binocularsUrl` explicitly instead of relying on the
+  derived `armadaUrl` port + 2.
+
+**Zscaler and Tailscale together.** Zscaler Client Connector can capture
+traffic meant for the tailnet. If tailnet hosts time out only while Zscaler is
+on, ask IT to exclude `100.64.0.0/10` (Tailscale's address range) and
+`*.ts.net` from the Zscaler tunnel and from SSL inspection.
 
 ## Local Development Setup
 

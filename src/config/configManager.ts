@@ -76,6 +76,7 @@ export class ConfigManager {
                 lookoutUrl: context.lookoutUrl,
                 forceNoTls: context.forceNoTls,
                 caCertPath: this.resolveCaCertPath(context.caCertPath),
+                useSystemCertificates: this.useSystemCertificates(),
                 currentContext: contextName,
                 auth: this.extractAuth(context)
             };
@@ -87,6 +88,7 @@ export class ConfigManager {
                 armadaUrl: config.armadaUrl,
                 forceNoTls: (config as any).forceNoTls,
                 caCertPath: this.resolveCaCertPath((config as any).caCertPath),
+                useSystemCertificates: this.useSystemCertificates(),
                 auth: this.extractAuth(config as any)
             };
         }
@@ -108,6 +110,15 @@ export class ConfigManager {
         }
         const setting = vscode.workspace.getConfiguration('armada').get<string>('caCertPath');
         return setting && setting.trim() !== '' ? setting : undefined;
+    }
+
+    /**
+     * Whether to trust the OS certificate store in addition to Node's bundled
+     * roots. On by default so a corporate CA installed by IT (Zscaler,
+     * Netskope) works without configuration.
+     */
+    private useSystemCertificates(): boolean {
+        return vscode.workspace.getConfiguration('armada').get<boolean>('useSystemCertificates', true) !== false;
     }
 
     /**
