@@ -322,7 +322,9 @@
     "pretest": "npm run compile && npm run compile:tests && npm run lint",
     "lint": "eslint src --ext ts",
     "pretest:unit": "npm run compile:tests",
-    "test:unit": "mocha 'out/test/unit/**/*.test.js'",
+    "test:unit": "mocha --require out/test/unit/setup/tlsFixture.js 'out/test/unit/**/*.test.js'",
+    "pretest:webview": "npm run compile:tests",
+    "test:webview": "mocha --require out/test/unit/setup/tlsFixture.js --timeout 60000 'out/test/webview/**/*.test.js'",
     "test:integration": "node ./out/test/runTest.js",
     "test": "node ./out/test/runTest.js",
     "package": "vsce package"
@@ -340,6 +342,7 @@
     "eslint": "^10.8.0",
     "glob": "^13.0.6",
     "mocha": "^11",
+    "playwright": "1.65.0",
     "typescript": "^6.0.2"
   },
   "overrides": {

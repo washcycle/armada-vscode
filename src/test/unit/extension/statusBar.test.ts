@@ -9,7 +9,8 @@ import * as assert from 'assert';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { installVscodeMock, uninstallVscodeMock, mockState, resetMockState, setSetting, FakeStatusBarItem } from '../vscodeMock';
+import { installVscodeMock, uninstallVscodeMock, mockState, setSetting, FakeStatusBarItem } from '../vscodeMock';
+import { activateWithConfig } from '../support/activation';
 
 installVscodeMock();
 
@@ -27,32 +28,10 @@ JobTreeProvider.prototype.getJobCounts = function (this: Provider) {
     return originalGetJobCounts.call(this);
 };
 
-function makeContext() {
-    const store = new Map<string, unknown>();
-    const memento = {
-        get: (k: string, d?: unknown) => (store.has(k) ? store.get(k) : d),
-        update: async (k: string, v: unknown) => { store.set(k, v); },
-        keys: () => [...store.keys()],
-    };
-    return { subscriptions: [] as Array<{ dispose(): unknown }>, globalState: memento, workspaceState: memento } as any;
-}
-
-async function activateWithConfig(configPath: string) {
-    // Other test files uninstall the shared mock in their after() hooks, and the
-    // extension module is required at test time, so (re)install it here.
-    installVscodeMock();
-    resetMockState();
+async function activate(configPath: string) {
     lastProvider = undefined;
-    mockState.settings.set('armada.configPath', configPath);
-    mockState.settings.set('armada.autoRefresh', false);
-    const ctx = makeContext();
-    // Fresh module instance per activation
-    const extPath = require.resolve('../../../extension');
-    delete require.cache[extPath];
-    const ext = require(extPath) as typeof import('../../../extension');
-    await ext.activate(ctx);
-    const [contextItem, countsItem] = mockState.statusBarItems;
-    return { ctx, contextItem, countsItem };
+    const a = await activateWithConfig(configPath);
+    return { ctx: a.ctx, contextItem: a.contextItem, countsItem: a.countsItem };
 }
 
 function addJobs(provider: Provider, states: string[]) {
@@ -84,7 +63,7 @@ describe('Job count status bar item (activation)', () => {
             '    lookoutUrl: http://lookout.example.test:8089',
             '',
         ].join('\n'));
-        ({ ctx, contextItem, countsItem } = await activateWithConfig(configPath));
+        ({ ctx, contextItem, countsItem } = await activate(configPath));
     });
 
     afterEach(() => {
@@ -154,7 +133,7 @@ describe('Job count status bar item (unconfigured)', () => {
     it('is hidden when no config file exists', async () => {
         installVscodeMock();
         const missing = path.join(os.tmpdir(), `armada-missing-${process.pid}-${Date.now()}.yaml`);
-        const { ctx, contextItem, countsItem } = await activateWithConfig(missing);
+        const { ctx, contextItem, countsItem } = await activate(missing);
         try {
             assert.match(contextItem.text, /Not configured/);
             assert.strictEqual(countsItem.visible, false);
