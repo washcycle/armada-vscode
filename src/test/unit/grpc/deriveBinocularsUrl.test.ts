@@ -18,8 +18,22 @@ describe('deriveBinocularsUrl', () => {
         assert.strictEqual(deriveBinocularsUrl('armada.example.com:50051').url, 'armada.example.com:50053');
     });
 
-    it('offsets the port for an explicit http:// scheme, dropping the scheme', () => {
-        assert.strictEqual(deriveBinocularsUrl('http://armada.example.com:50051').url, 'armada.example.com:50053');
+    it('offsets the port for an explicit http:// scheme, keeping the scheme so TLS stays off', () => {
+        // Without the scheme the derived host:port would default to TLS while
+        // the Armada endpoint it came from is explicitly plaintext.
+        assert.strictEqual(deriveBinocularsUrl('http://armada.example.com:50051').url, 'http://armada.example.com:50053');
+    });
+
+    it('tolerates a trailing slash, uppercase scheme and whitespace', () => {
+        assert.strictEqual(deriveBinocularsUrl(' HTTP://localhost:30002/ ').url, 'http://localhost:30004');
+    });
+
+    it('derives from an IPv6 literal', () => {
+        assert.strictEqual(deriveBinocularsUrl('[::1]:30002').url, '[::1]:30004');
+    });
+
+    it('refuses an uppercase HTTPS:// scheme like https://', () => {
+        assert.strictEqual(deriveBinocularsUrl('HTTPS://armada.example.com:8443').url, null);
     });
 
     it('refuses to derive from port 443 rather than guessing 445', () => {

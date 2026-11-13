@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { ResolvedConfig } from '../types/config';
 import { ArmadaClient } from '../grpc/armadaClient';
+import { describeTlsMode } from '../grpc/endpoint';
 
 const SECRET_KEY_PATTERN = /password|token|secret|key/i;
 
@@ -120,7 +121,7 @@ export class ConfigPanel {
 
         const ctx = config.currentContext || 'default';
 
-        const tls = config.forceNoTls ? 'Disabled (forceNoTls)' : 'Enabled (auto-detect)';
+        const tls = describeTlsMode(config.armadaUrl, config.forceNoTls);
 
         const connectionRows = `
             <div class="row">
