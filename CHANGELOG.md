@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v1.0.0...armada-vscode-v1.1.0) (2026-11-13)
+
+
+### Features
+
+* **tls:** trust the OS certificate store by default ([#99](https://github.com/washcycle/armada-vscode/issues/99)) ([8106635](https://github.com/washcycle/armada-vscode/commit/810663594fe5d62be56f7535655e89ab7c368d33))
+
 ## [1.0.0](https://github.com/washcycle/armada-vscode/compare/armada-vscode-v0.6.0...armada-vscode-v1.0.0) (2026-11-13)
 
 
