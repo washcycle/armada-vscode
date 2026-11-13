@@ -12,6 +12,33 @@ export interface LookoutConfig {
     caCerts?: Buffer;
     /** The configured path, used only to make certificate errors actionable. */
     caCertPath?: string;
+    /** Request timeout in milliseconds (default 30s). */
+    timeoutMs?: number;
+}
+
+/** Default request timeout for Lookout calls. */
+export const LOOKOUT_TIMEOUT_MS = 30_000;
+
+function isLoopbackHost(host: string): boolean {
+    const h = host.toLowerCase().replace(/^\[|\]$/g, '');
+    return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || /^127(?:\.\d{1,3}){3}$/.test(h);
+}
+
+/**
+ * Normalise a configured Lookout base URL: trim whitespace, drop trailing
+ * slashes, and add a scheme when none was given (`http://` for localhost and
+ * loopback addresses, `https://` otherwise). Without a scheme, `new URL()`
+ * parses "localhost:30000" as protocol "localhost:" and the request silently
+ * goes to port 80.
+ */
+export function normalizeLookoutUrl(raw: string): string {
+    let url = (raw ?? '').trim().replace(/\/+$/, '');
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+        const host = url.split(/[/:?#]/)[0] || url;
+        const bracketed = url.startsWith('[') ? url.slice(0, url.indexOf(']') + 1) : host;
+        url = `${isLoopbackHost(bracketed) ? 'http' : 'https'}://${url}`;
+    }
+    return url;
 }
 
 export interface LookoutJob {
@@ -62,10 +89,12 @@ export class LookoutClient {
     private authHeader?: string;
     private httpsAgent?: https.Agent;
     private caCertPath?: string;
+    private timeoutMs: number;
 
     constructor(config: LookoutConfig) {
-        this.lookoutUrl = config.lookoutUrl.replace(/\/$/, ''); // Remove trailing slash
+        this.lookoutUrl = normalizeLookoutUrl(config.lookoutUrl);
         this.authHeader = config.authHeader;
+        this.timeoutMs = config.timeoutMs ?? LOOKOUT_TIMEOUT_MS;
         if (config.caCerts) {
             // `ca` replaces the default roots, so the caller passes a bundle
             // that already includes them.
@@ -188,7 +217,8 @@ export class LookoutClient {
             }
 
             const options: https.RequestOptions = {
-                hostname: urlObj.hostname,
+                // URL.hostname keeps IPv6 brackets ("[::1]"), which DNS lookup rejects.
+                hostname: urlObj.hostname.replace(/^\[|\]$/g, ''),
                 port: urlObj.port || (isHttps ? 443 : 80),
                 path: urlObj.pathname + urlObj.search,
                 method: 'POST',
@@ -199,24 +229,49 @@ export class LookoutClient {
             }
 
             const req = client.request(options, (res) => {
-                let data = '';
+                // Collect raw bytes and decode once: decoding per chunk corrupts
+                // multi-byte UTF-8 characters split across chunk boundaries.
+                const chunks: Buffer[] = [];
 
-                res.on('data', (chunk) => {
-                    data += chunk;
+                res.on('data', (chunk: Buffer) => {
+                    chunks.push(chunk);
                 });
 
                 res.on('end', () => {
+                    const data = Buffer.concat(chunks).toString('utf8');
+                    const status = res.statusCode ?? 0;
+
+                    let parsed: any;
+                    let parseError: unknown;
                     try {
-                        const parsed = JSON.parse(data);
-                        if (parsed.code && parsed.message) {
-                            reject(new Error(`Lookout API error: ${parsed.message}`));
-                        } else {
-                            resolve(parsed as T);
-                        }
+                        parsed = JSON.parse(data);
                     } catch (error) {
-                        reject(new Error(`Failed to parse response: ${error}`));
+                        parseError = error;
                     }
+
+                    if (status < 200 || status >= 300) {
+                        const serverMessage = parsed?.message
+                            ?? data.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+                        reject(new Error(
+                            `Lookout returned HTTP ${status}${res.statusMessage ? ` ${res.statusMessage}` : ''} ` +
+                            `from ${url}${serverMessage ? `: ${serverMessage}` : ''}`
+                        ));
+                        return;
+                    }
+                    if (parseError !== undefined) {
+                        reject(new Error(`Failed to parse response: ${parseError}`));
+                        return;
+                    }
+                    if (parsed.code && parsed.message) {
+                        reject(new Error(`Lookout API error: ${parsed.message}`));
+                        return;
+                    }
+                    resolve(parsed as T);
                 });
+            });
+
+            req.setTimeout(this.timeoutMs, () => {
+                req.destroy(new Error(`Lookout did not respond within ${Math.round(this.timeoutMs / 1000)}s (${url})`));
             });
 
             req.on('error', (error) => {

@@ -1,12 +1,12 @@
 /**
  * LookoutClient against real HTTP/HTTPS servers on non-default ports.
- * `knownBug()` cases document armada-vscode-ofj and flip when it's fixed.
+ * Includes regression tests for armada-vscode-ofj (encoding, IPv6, scheme-less URLs, status, timeout).
  */
 import * as assert from 'assert';
-import { LookoutClient, LookoutJob } from '../../../api/lookoutClient';
+import { LookoutClient, LookoutJob, normalizeLookoutUrl } from '../../../api/lookoutClient';
 import { tlsFixture } from '../setup/tlsFixture';
 import { startLookout, startBadGateway, startSilentTcp, HttpFixture, UNICODE_OWNER } from '../support/connectionFixtures';
-import { knownBug, within } from '../support/knownBug';
+import { within } from '../support/knownBug';
 
 const REQUEST = { filters: [], order: { field: 'submitted', direction: 'DESC' as const }, take: 1 };
 
@@ -57,25 +57,53 @@ describe('LookoutClient (real HTTP, non-default ports)', function () {
         });
     });
 
-    knownBug('armada-vscode-ofj', 'multi-byte UTF-8 split across chunks is decoded intact', async () => {
+    // Regression tests for armada-vscode-ofj.
+    it('decodes multi-byte UTF-8 split across chunks intact', async () => {
         const jobs = await fetchJobs(`http://localhost:${plain.port}`);
         assert.strictEqual(jobs[0].owner, UNICODE_OWNER);
     });
 
-    knownBug('armada-vscode-ofj', 'IPv6 literal http://[::1]:port', async () => {
-        assert.ok((await fetchJobs(`http://[::1]:${plain.port}`)).length > 0);
+    it('reaches an IPv6 literal http://[::1]:port', async function () {
+        const jobs = await fetchJobs(`http://[::1]:${plain.port}`).catch(e => {
+            if (/EADDRNOTAVAIL|ENETUNREACH|EAFNOSUPPORT/.test(String(e))) { this.skip(); }
+            throw e;
+        });
+        assert.ok(jobs.length > 0);
     });
 
-    knownBug('armada-vscode-ofj', 'scheme-less localhost:port reaches the configured port', async () => {
-        // Currently parsed as protocol "localhost:" and sent to port 80.
-        assert.ok((await fetchJobs(`localhost:${plain.port}`, 3000)).length > 0);
+    it('sends a scheme-less localhost:port URL to that port over http', async () => {
+        assert.strictEqual(await requestedPath(`localhost:${plain.port}`), '/api/v1/jobs?backend=jsonb');
     });
 
-    knownBug('armada-vscode-ofj', 'non-2xx responses report the HTTP status', async () => {
-        await assert.rejects(fetchJobs(`http://localhost:${badGateway.port}`), /502/);
+    it('tolerates surrounding whitespace and several trailing slashes', async () => {
+        assert.strictEqual(await requestedPath(`  http://localhost:${plain.port}///  `), '/api/v1/jobs?backend=jsonb');
     });
 
-    knownBug('armada-vscode-ofj', 'a server that never responds is rejected within 10s', async () => {
-        await assert.rejects(fetchJobs(`http://localhost:${silent.port}`, 10000), (e: Error) => !/did not settle/.test(e.message));
-    }, 15000);
+    it('reports the HTTP status for non-2xx responses', async () => {
+        await assert.rejects(fetchJobs(`http://localhost:${badGateway.port}`), /HTTP 502.*Bad Gateway/);
+    });
+
+    it('rejects with a timeout when the server never responds', async () => {
+        const client = new LookoutClient({ lookoutUrl: `http://localhost:${silent.port}`, timeoutMs: 500 });
+        await assert.rejects(within(client.getJobs(REQUEST), 5000, 'getJobs'), /did not respond within/);
+    });
+});
+
+describe('normalizeLookoutUrl', () => {
+    const cases: Array<[string, string]> = [
+        ['http://lookout.example.com', 'http://lookout.example.com'],
+        ['https://lookout.example.com/', 'https://lookout.example.com'],
+        ['https://lookout.example.com/base//', 'https://lookout.example.com/base'],
+        ['  https://lookout.example.com  ', 'https://lookout.example.com'],
+        ['localhost:30000', 'http://localhost:30000'],
+        ['127.0.0.1:30000', 'http://127.0.0.1:30000'],
+        ['[::1]:30000', 'http://[::1]:30000'],
+        ['lookout.example.com', 'https://lookout.example.com'],
+        ['lookout.example.com:8080/lookout', 'https://lookout.example.com:8080/lookout'],
+    ];
+    for (const [input, expected] of cases) {
+        it(`${JSON.stringify(input)} → ${expected}`, () => {
+            assert.strictEqual(normalizeLookoutUrl(input), expected);
+        });
+    }
 });
