@@ -349,9 +349,9 @@
     "serialize-javascript": ">=7.0.3"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.14.4",
+    "@grpc/grpc-js": "^1.14.5",
     "@grpc/proto-loader": "^0.8.1",
-    "js-yaml": "^5.2.2",
-    "protobufjs": "^8.6.6"
+    "js-yaml": "^5.5.0",
+    "protobufjs": "^8.8.1"
   }
 }
